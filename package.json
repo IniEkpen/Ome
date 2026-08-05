@@ -1,0 +1,22 @@
+{
+  "name": "ome",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IniEkpen/Ome.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/IniEkpen/Ome/issues"
+  },
+  "homepage": "https://github.com/IniEkpen/Ome#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
