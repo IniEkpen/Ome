@@ -1,0 +1,8 @@
+/*/*env
+/.env
+/.json
+
+# No pycache files
+/fast_app/__pycache__/
+/fast_app/api/__pycache__/
+fast_app/api/receipt.jpg
