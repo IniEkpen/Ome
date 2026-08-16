@@ -25,7 +25,7 @@ app.post('/users/signin/:id', async(req, res) => {
         const userId = req.params.id;
         console.log(req.body)
         const {username} = req.body;
-        const exist = await GetProfile(username);
+        const exist = await profile.GetProfile(username);
         if (exist) {
             return res.status(200).json({'UserExists': true})
         }
