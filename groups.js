@@ -16,11 +16,13 @@ const pool = new Pool({
 module.exports = {pool};
 let UserExists = false
 
+app.use(express.json())
 
 //checking if a user already exist in the system
 app.post('/users/signin/:id', async(req, res) => {
     try{
         const userId = req.params.id;
+        console.log(req.body)
         const {username} = req.body;
         const exist = await GetProfile(username);
         if (exist) {
