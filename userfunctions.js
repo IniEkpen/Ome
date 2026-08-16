@@ -1,4 +1,4 @@
-const {pool} = require('./groups.js')
+
 /*const connected = async() => {
     console.log('check')
     //let email = 'johndoe@gmail.com'
@@ -14,17 +14,19 @@ const {pool} = require('./groups.js')
 
 connected();
 */
-
 class Profile {
-    constructor(username) {
+    constructor(username,pool) {
+        this.pool = 
         this.username = username
     }
    
     //keep track of user thats logged in at the moment
     async GetProfile(username){
+        console.log(username)
         try{
-            var  exist = await pool.query('SELECT username FROM users WHERE username =$1', [username])
-            console.log(exist)
+            const {pool} = require('./groups.js');
+            const exist = await pool.query('SELECT username FROM users WHERE username =$1', [username])
+            console.log("EXIST VALUE",exist)
             if (exist != null)
                 return true
             else{

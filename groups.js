@@ -1,6 +1,5 @@
 const dotenv = require('dotenv')
 dotenv.config()
-const {profile} = require('./userfunctions.js')
 const port= 3000
 const Pool = require('pg-pool')
 const express = require('express')
@@ -15,8 +14,8 @@ const pool = new Pool({
     maxUses: 7500, //close connection, replace connection
 })
 module.exports = {pool};
+const {profile} = require('./userfunctions.js')
 let UserExists = false
-
 app.use(express.json())
 
 //checking if a user already exist in the system
@@ -25,6 +24,7 @@ app.post('/users/signin/:id', async(req, res) => {
         const userId = req.params.id;
         console.log(req.body)
         const {username} = req.body;
+        console.log(username)
         const exist = await profile.GetProfile(username);
         if (exist) {
             return res.status(200).json({'UserExists': true})
