@@ -1,5 +1,4 @@
 const {pool} = require('./groups.js')
-module.exports = {Profile}
 /*const connected = async() => {
     console.log('check')
     //let email = 'johndoe@gmail.com'
@@ -178,3 +177,5 @@ class Group {
 
    
 }
+const profile = new Profile()
+module.exports = {profile}
