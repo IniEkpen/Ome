@@ -4,6 +4,7 @@ const port= 3000
 const Pool = require('pg-pool')
 const express = require('express')
 const app = express()
+console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
     port:5432,
