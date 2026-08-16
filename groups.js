@@ -1,5 +1,6 @@
 const dotenv = require('dotenv')
 dotenv.config()
+const {profile} = require('./userfunctions.js')
 const port= 3000
 const Pool = require('pg-pool')
 const express = require('express')
