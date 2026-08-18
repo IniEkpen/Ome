@@ -27,13 +27,14 @@ class Profile {
             const {pool} = require('./groups.js');
             const exist = await pool.query('SELECT username FROM users WHERE username =$1', [username])
             console.log("EXIST VALUE",exist)
-            if (exist != null)
+            if (exist.rowCount > 0)
                 return true
             else{
                 return false
             }
         }catch(profileError){
             console.log(profileError)
+            throw profileError
         }
 
 

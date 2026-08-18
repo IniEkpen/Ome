@@ -27,6 +27,7 @@ app.post('/users/signin/:id', async(req, res) => {
         const {username} = req.body;
         console.log(username)
         const exist = await profile.GetProfile(username);
+        console.log("What Route Received:", exist, "Type:", typeof exist);
         if (exist) {
             return res.status(200).json({'UserExists': true})
         }
