@@ -45,11 +45,19 @@ app.post('/users/signin/:id', async(req, res) => {
 })
 
 
-app.get('/users/createaccount', async(req,res)=>{
-    accountInfo = req.body
-    exist = await CreateProfile(accountInfo)
-    username = exist.rows
-    return res.json(exist.rows)
+app.post('/users/createaccount/:id', async(req,res)=>{
+     try{
+    const userId = req.params.id;
+    console.log(req.body)
+    const {username, email,phone, password, stripe_customer_id} = req.body;
+    const card_info = 'no'
+    recodred = await CreateProfile(accountInfo(username, email, phone, password, stripe_customer_id, card_info))
+    if (recorded) {
+        return res.status(204).send();
+    }
+    }catch(error){
+        return res.status(500).json({eror:error.message})
+     }
 
 
 })
