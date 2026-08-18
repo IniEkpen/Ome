@@ -8,7 +8,10 @@ console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
     port:5432,
-    ssl:true,
+    ssl:{
+        require: true,
+        rejectUnauthorized:false
+    },
     max:20,
     idleTimeoutMillis:1000, // close idle clients(nothing being sent through)
     connectionTimeoutMillis:5000, //after 1 sec connection unable send error
