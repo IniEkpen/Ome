@@ -40,14 +40,30 @@ class Profile {
 
     }
     //creating profile card_info initialized to no because haven't gone to oayment window
-   /* async CreateProfile (username,email, role ,phone,password, stripe_customer_id, card_info){
-        await pool.query('INSERT INTO users (*) ')
-       
+   async CreateProfile (username,email,phone,password, stripe_customer_id, card_info){
 
+        try{
+            const {pool} = require('./groups.js');
+            const values = [username, email, phone, password, stripe_customer_id, card_info]
+            const query = 'INSERT INTO users  (username, email, phone, password, stripe_customer_id, card_info) VALUES ($1, $2, $3, $4, $5, $6)';
+            recorded = await pool.query(query, values)
+            if (recorded.rowCount > 0)
+                return true
+            else{
+                throw new Error ("no user records were updated")
+            }
+        }
+        catch(Accounterror){
+            console.log(Accounterror)
+            throw Accounterror
+
+        }
+        
 
     }
     //check if cards info filled out if not returns has not submitted and doesn't create/join group
-    async CardInfo() {
+    
+    /*async CardInfo() {
         var  card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
 
 
@@ -175,10 +191,10 @@ class Group {
 
 
 
-*/
 
 
-   
+
+*/   
 }
 const profile = new Profile()
 module.exports = {profile}
