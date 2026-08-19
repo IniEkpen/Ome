@@ -52,7 +52,7 @@ app.post('/users/createaccount/:id', async(req,res)=>{
         console.log(req.body)
         const {username, email, phone, password, stripe_customer_id} = req.body;
         const card_info = 'no'
-        recodred = await CreateProfile(accountInfo(username, email, phone, password, stripe_customer_id, card_info))
+        const recorded = await profile.CreateProfile(username, email, phone, password, stripe_customer_id, card_info)
         if (recorded) {
             return res.status(204).send();
         }
