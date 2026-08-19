@@ -41,13 +41,15 @@ class Profile {
     }
     //creating profile card_info initialized to no because haven't gone to oayment window
    async CreateProfile (username,email,phone,password, stripe_customer_id, card_info){
-
+        console.log(username)
         try{
             const {pool} = require('./groups.js');
             const values = [username, email, phone, password, stripe_customer_id, card_info]
-            const query = 'INSERT INTO users  (username, email, phone, password, stripe_customer_id, card_info) VALUES ($1, $2, $3, $4, $5, $6)';
-            recorded = await pool.query(query, values)
-            if (recorded.rowCount > 0)
+            const query = 'INSERT INTO users (username, email, phone, password, stripe_customer_id, card_info) VALUES ($1, $2, $3, $4, $5, $6)'
+            const record = await pool.query(query, values)
+            console.log(record)
+            console.log(record.rowCount)
+            if (record.rowCount > 0)
                 return true
             else{
                 throw new Error ("no user records were updated")
