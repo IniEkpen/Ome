@@ -67,6 +67,7 @@ class Profile {
     
     async CardInfo() {
         try{
+            const {pool} = require('./groups.js');
             const card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
             if (card)
                 return true
