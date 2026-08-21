@@ -18,7 +18,7 @@ const pool = new Pool({
     maxUses: 7500, //close connection, replace connection
 })
 module.exports = {pool};
-const {profile} = require('./userfunctions.js')
+const {profile, group} = require('./userfunctions.js')
 let UserExists = false
 app.use(express.json())
 
@@ -54,18 +54,68 @@ app.post('/users/createaccount/:id', async(req,res)=>{
         const card_info = 'no'
         const recorded = await profile.CreateProfile(username, email, phone, password, stripe_customer_id, card_info)
         if (recorded) {
-            return res.status(204).send();
+            return res.status(204).send()
         }
     }catch(error){
-        return res.status(500).json({eror:error.message})
+        return res.status(500).json({error:error.message})
      }
 
 
 })
 
+// to check if user has filled out payment info before making any other request
+app.post('/users/group/payment/:id', async(req,res)=>{
+    try{
+        const userId = req.params.id
+        console.log(req.body)
+        const {username} = req.body
+        const exist = await CardInfo(username)
+        if (exist) {
+            return res.status(200).json({'CardFilled': true})
+        }
+        else {
+            return res.status(200).json({'CardFilled': false})
+        }
+        
+    }catch(error){
+        return res.status(500).json({error:error.message})
+    }
 
-app.get('/group/create', async (req, res) => {
-    await createDiffieHellmanGroup()
+})
+
+
+app.post('/users/group/create/:id', async (req, res) => {
+    
+    try{
+        const userId = req.params.id;
+        const{username, userList} = req.body
+        const group = await group.CreateGroup()
+
+        if (group){
+            if (userList != null){
+                const check = await group.AddUserGroup()
+                if (check){
+                   return res.status(200).json({'Group Created':true, 'Users Added':userList})
+                }
+                //if there are users but they werent added
+                else{
+                    return res.status(200).json({'Group Created': true, 'Users Added': None})
+                }
+                
+            }
+            else{
+                return res.status(200).json({'Group Created': true, 'Users Added': Skip})
+            }
+
+        }
+        else{
+            //if group didnt have card info payment filled
+            return res.status(200).json({'Group Created': false})
+        }
+    }catch(error){
+        return res.status(500).json({error:error.message})
+
+    }
 
 
 })
@@ -73,7 +123,7 @@ app.get('/group/create', async (req, res) => {
 
 
 
-app.get('/group/join', async(req, res) => {
+app.get('/users/group/join/:id', async(req, res) => {
     await CardInfo()
     await JoinGroup()
 
@@ -86,7 +136,7 @@ app.get('/group/join', async(req, res) => {
 
    
 });
-app.get('/group/add', async (req, res)=>{
+app.get('/group/addusers/:id', async (req, res)=>{
     await AddUserGroup()
 })
 //check if they want to delete group

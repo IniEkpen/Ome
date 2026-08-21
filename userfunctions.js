@@ -65,14 +65,24 @@ class Profile {
     }
     //check if cards info filled out if not returns has not submitted and doesn't create/join group
     
-    /*async CardInfo() {
-        var  card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
-
-
+    async CardInfo() {
+        try{
+            const card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
+            if (card)
+                return true
+            else{
+                //card info doesnt exist or hasnt been filled out
+                return false
+            }
+        }catch(error){
+            console.log(Carderror)
+             throw Carderror
+        }
+        
 
 
     }
-    DeleteProfile(username){
+    async DeleteProfile(username){
        
        
 
@@ -82,6 +92,7 @@ class Profile {
 
 
     }
+    
 }
 
 
@@ -91,64 +102,142 @@ class Profile {
 
 
 class Group {
-    constructor(groupId, username){
-        this.groupId = groupId
+    constructor(username){
         this.username = username
-
-
-
 
     }
     async checkGroups (username){
-        //send back groups that this username is apart of and what role
-            const check = await pool.query('SELECT user_id, group_id FROM groupmembers WHERE role =$1', "owner")
+        //send back owner of all groups
+        try {
+            const {pool} = require('./groups.js');
+            const query = `SELECT g.id, g.group_name
+            FROM groups g
+            JOIN groupmembers gm ON gm.group_id = g.id
+            JOIN users u ON u.id = gm.user_id
+            WHERE u.username = $1
+            AND gm.role = 'owner';
+            `;
+            const check = await pool.query(query, [username]);
             console.log(check)
             if (check != null)
                 return check
             else {
                 return null
             }
+
         }catch(checkError){
             console.log(checkError)
         }
+    }
+
+    async isOwner(groupName, username){
+        try{
+             const query = `
+                SELECT EXISTS (
+                SELECT 1
+                FROM groupmembers gm
+                JOIN groups g ON g.id = gm.group_id
+                JOIN users u ON u.id = gm.user_id
+                WHERE g.group_name = $1
+                AND u.username = $2
+                AND gm.role = 'owner'
+                ) AS is_owner;
+                `
+
+            const result = await pool.query(query, [groupName, username]);
+            if (result.rows._isowner){
+                return true
+            }
+            else{
+                return false
+            }
+        }catch(error){
+            console.log(error)
+            
+        }
+    }
 
 
 
 
 
 
-    CreateGroup() {
+    async CreateGroup(groupName, username) {
         //creates new group, making the person who created it the owner
         try {
+            const {pool} = require('./groups.js');
+            const cardData = await profile.CardInfo();
+            if(cardData){
+                //insert a new group
+                //lets say you want to add another user or not when group is first created
+                const query = `WITH new_group AS (
+                INSERT INTO groups (group_name, created_by_user)
+                SELECT $1, id FROM users WHERE username = $2
+                RETURNING id)
+                INSERT INTO groupmembers (group_id, user_id, role)
+                SELECT new_group.id, (SELECT id FROM users WHERE username = $2), 'owner'
+                FROM new_group
+                RETURNING group_id, user_id, role;`;
 
-
-
-
+                const result = await pool.query(query, [groupName, username]);
+                if (result.rowCount > 0) {
+                    return true
+                }  
+                else{
+                    throw new Error ("no user records were updated")
+                }   
+            
+            }
+            else{
+                return false
+            }
         }catch(createError){
             console.log(createError)
+            throw createError
         }
+        
     }
-    LeaveGroup(){
-
-
-    }
-
-
-    JoinGroup(){
+    async LeaveGroup(username){
 
 
     }
 
 
+    async JoinGroup(username){
 
 
-    AddUsertoGroup(username){
+    }
+
+
+
+
+    async AddUsertoGroup(groupName, userList, role) {
         //Add new user to existing Group?? might have to call checkgroups??
         //user has to be owner add user to group
-        await this.checkGroups(username)
+        
          try {
+            const check = await this.isOwner(groupName,username)
+            if (check){
+                const query = `
+                INSERT INTO groupmembers (group_id, user_id, role)
+                SELECT g.id, u.id, $3
+                FROM groups g, users u
+                WHERE g.group_name = $1
+                AND u.username = $2
+                RETURNING group_id, user_id, role;
+                `
 
-
+                const result = await pool.query(query, [groupName, username, role]);
+                if (result.rowCount > 0) {
+                    return true
+                }  
+                else{
+                    throw new Error ("no user records were updated")
+                }   
+            }
+            else{
+                return false
+            }
 
 
 
@@ -163,7 +252,7 @@ class Group {
     }
 
 
-    DeleteUserFromGroup(username){
+    async DeleteUserFromGroup(username){
         //Delete user from group?? check if user is the owner
          try {
 
@@ -182,7 +271,7 @@ class Group {
     }
 
 
-    DeleteGroup(){
+    async DeleteGroup(username, groupName){
         //can only delete group if you are owner of the group
 
 
@@ -191,12 +280,8 @@ class Group {
     }
 
 
-
-
-
-
-
-*/   
 }
+
 const profile = new Profile()
-module.exports = {profile}
+const group = new Group();
+module.exports = {profile, group}
