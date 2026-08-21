@@ -19,7 +19,6 @@ const pool = new Pool({
 })
 module.exports = {pool};
 const {profile, group} = require('./userfunctions.js')
-let UserExists = false
 app.use(express.json())
 
 //checking if a user already exist in the system
@@ -66,10 +65,12 @@ app.post('/users/createaccount/:id', async(req,res)=>{
 // to check if user has filled out payment info before making any other request
 app.post('/users/group/payment/:id', async(req,res)=>{
     try{
+        console.log('ENTERED the post')
         const userId = req.params.id
         console.log(req.body)
         const {username} = req.body
-        const exist = await CardInfo(username)
+        const exist = await group.CardInfo(username)
+        console.log(exist)
         if (exist) {
             return res.status(200).json({'CardFilled': true})
         }
