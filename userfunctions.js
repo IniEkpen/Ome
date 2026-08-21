@@ -65,7 +65,8 @@ class Profile {
     }
     //check if cards info filled out if not returns has not submitted and doesn't create/join group
     
-    async CardInfo() {
+    async CardInfo(username) {
+        console.log('reached function')
         try{
             const {pool} = require('./groups.js');
             const card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
