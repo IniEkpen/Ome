@@ -69,7 +69,7 @@ app.post('/users/group/payment/:id', async(req,res)=>{
         const userId = req.params.id
         console.log(req.body)
         const {username} = req.body
-        const exist = await group.CardInfo(username)
+        const exist = await profile.CardInfo(username)
         console.log(exist)
         if (exist) {
             return res.status(200).json({'CardFilled': true})
