@@ -199,13 +199,54 @@ class Group {
         }
         
     }
-    async LeaveGroup(username){
+    async LeaveGroup(username, groupName){
+        try{
+            const owner = await this.isOwner()
+            if (isOwner){
+                const group = await this.DeleteUserFromGroup(username, groupName)
+            }
+            const deleted = await this.DeleteGroup(username,groupName)
+            if (deleted){
+                return true
+            }
+            else{
+              return false  
+            }
+        }catch(LeaveError){
+            console.log(LeaveError)
+            throw LeaveError 
+            
+        }
+            
+
 
 
     }
 
 
     async JoinGroup(username){
+        try{
+            const {pool} = require('./groups.js');
+            const cardData = await profile.CardInfo();
+            if(cardData){
+                const profile = await GetProfile(username)
+                if (profile) {
+                    const query = `
+                    INSERT INTO groupmembers (group_id, user_id, role)
+                    SELECT g.id, u.id, $3
+                    FROM groups g, users u
+                    WHERE g.group_name = $1
+                    AND u.username = $2
+                    RETURNING group_id, user_id, role;`
+                    result = await pool.query(query, [groupName,username, role]);
+
+                }
+            }
+        }catch(Joinerror){
+            console.log(Joinerror)
+            throw Joinerror
+
+        }
 
 
     }
@@ -218,32 +259,39 @@ class Group {
         //user has to be owner add user to group
         
          try {
+            const {pool} = require('./groups.js');
             const check = await this.isOwner(groupName,username)
+            const addList = {}
             if (check){
-                const query = `
-                INSERT INTO groupmembers (group_id, user_id, role)
-                SELECT g.id, u.id, $3
-                FROM groups g, users u
-                WHERE g.group_name = $1
-                AND u.username = $2
-                RETURNING group_id, user_id, role;
-                `
+                let result =0
+                for (let i = 0; i < userList; i++) {
+                    //check if each user is exist first(get profile)
+                        const profile = await GetProfile(userList[i])
+                        if (profile) {
+                            const query = `
+                            INSERT INTO groupmembers (group_id, user_id, role)
+                            SELECT g.id, u.id, $3
+                            FROM groups g, users u
+                            WHERE g.group_name = $1
+                            AND u.username = $2
+                            RETURNING group_id, user_id, role;
+                            `
+                            result = await pool.query(query, [groupName,userList[i], role]);
+          
 
-                const result = await pool.query(query, [groupName, username, role]);
-                if (result.rowCount > 0) {
-                    return true
-                }  
-                else{
-                    throw new Error ("no user records were updated")
-                }   
-            }
-            else{
-                return false
-            }
+                        }
+                            
+                        if (result.rowsCount > 0){
+                            addList[userList[i].toString()] = "added"
 
+                        }
+                        else{
+                            addList[userList[i].toString()] = "null"
+                        }
 
-
-
+                }
+             }
+            
         }catch(createError){
             console.log(createError)
         }

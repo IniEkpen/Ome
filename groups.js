@@ -89,25 +89,21 @@ app.post('/users/group/create/:id', async (req, res) => {
     
     try{
         const userId = req.params.id;
-        const{username, userList} = req.body
-        const group = await group.CreateGroup()
-
+        const{username,groupName, userList} = req.body
+        const group = await group.CreateGroup(groupName, username)
         if (group){
-            if (userList != null){
-                const check = await group.AddUserGroup()
-                if (check){
-                   return res.status(200).json({'Group Created':true, 'Users Added':userList})
-                }
-                //if there are users but they werent added
-                else{
-                    return res.status(200).json({'Group Created': true, 'Users Added': None})
-                }
+            if (!userList.isEmpty()){
+                const role = 'member'
+                const check = await group.AddUserGroup(groupName,userList, role)
                 
+                return res.status(200).json({'Group Created':true, 'Users Added':check})
             }
+            //if there are users but they werent added//
             else{
-                return res.status(200).json({'Group Created': true, 'Users Added': Skip})
+                return res.status(200).json({'Group Created': true, 'Users Added': 'None'
+                })
             }
-
+         
         }
         else{
             //if group didnt have card info payment filled
@@ -125,7 +121,6 @@ app.post('/users/group/create/:id', async (req, res) => {
 
 
 app.get('/users/group/join/:id', async(req, res) => {
-    await CardInfo()
     await JoinGroup()
 
 
@@ -141,20 +136,29 @@ app.get('/group/addusers/:id', async (req, res)=>{
     await AddUserGroup()
 })
 //check if they want to delete group
-app.get('/group/deletegroup', async(req, res) => {
-    return res.json({ message: "Are you sure?"})
+app.get('/group/deletegroup/:id', async(req, res) => {
+    return res.status(200).json({ message: "Are you sure?"})
 
 
 });
 
 
-app.get('/group/deletegroup/:choice', async(req, res) => {
-    choice = req.params.choice
+app.post('/group/deletegroup/choice/:id', async(req, res) => {
+    const userId = req.params.id;
+    const {username, groupName, choice} = req.body
     if ( choice == 'no')
         return res.json({message: "Chill"})
     else {
-        await DeleteGroup()
-        return res.json({message: "Delete"})
+        const check = await DeleteGroup(username, groupName)
+        if (check){
+            return res.status(200).json({message: "Deleted"})
+
+        }
+
+        else{
+            return res.status(500).json({message:"Unable to delete"})
+        }
+        
 
 
     }
