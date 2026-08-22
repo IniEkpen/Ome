@@ -183,6 +183,7 @@ class Group {
 
                 const result = await pool.query(query, [groupName, username]);
                 if (result.rowCount > 0) {
+                    console.log('IT WORKED')
                     return true
                 }  
                 else{
@@ -277,16 +278,17 @@ class Group {
                             RETURNING group_id, user_id, role;
                             `
                             result = await pool.query(query, [groupName,userList[i], role]);
-          
+                            console.log("Is IT WORKING")
 
                         }
                             
                         if (result.rowsCount > 0){
-                            addList[userList[i].toString()] = "added"
+                            return addList[userList[i].toString()] = "added"
+                            console.log('WOrked AGaIN')
 
                         }
                         else{
-                            addList[userList[i].toString()] = "null"
+                            return addList[userList[i].toString()] = "null"
                         }
 
                 }
@@ -294,6 +296,7 @@ class Group {
             
         }catch(createError){
             console.log(createError)
+            throw createError
         }
 
 
