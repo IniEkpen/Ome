@@ -100,7 +100,7 @@ app.post('/users/group/create/:id', async (req, res) => {
         if (groupie){
             console.log("CHECK1")
             //WORKS UP TO HERE NOW
-            if (!userList.isEmpty()){
+            if (userList.length > 0){
                  console.log("CHECK2")
                 const role = 'member'
                 const check = await group.AddUsertoGroup(groupName,userList, role)
