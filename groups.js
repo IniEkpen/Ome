@@ -86,6 +86,7 @@ app.post('/users/group/payment/:id', async(req,res)=>{
 
 
 app.post('/users/group/create/:id', async (req, res) => {
+    console.log("ENTERED FUNCTION")
     
     try{
         const userId = req.params.id;
