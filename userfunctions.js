@@ -167,6 +167,7 @@ class Group {
     async CreateGroup(groupName, username) {
         //creates new group, making the person who created it the owner
         try {
+            console.log("CHECK IF IT HIT CREATE GROUP")
             const {pool} = require('./groups.js');
             const cardData = await profile.CardInfo();
             if(cardData){
