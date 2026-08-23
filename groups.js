@@ -92,7 +92,9 @@ app.post('/users/group/create/:id', async (req, res) => {
         const userId = req.params.id;
         const{username,groupName, userList} = req.body
         console.log("VARIABLES", username, groupName, userList)
+        console.log('Creating group with:', { groupName, username })
         const group = await group.CreateGroup(groupName, username)
+        console.log('Group created successfully:', group)
         if (group){
             console.log("CHECK1")
             if (!userList.isEmpty()){
