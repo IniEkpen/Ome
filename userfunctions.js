@@ -138,6 +138,7 @@ class Group {
 
     async isOwner(groupName, username){
         try{
+            const {pool} = require('./groups.js');
             console.log("ENTERED is OWNER")
              const owner = `
                 SELECT EXISTS (
