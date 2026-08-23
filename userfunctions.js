@@ -171,6 +171,7 @@ class Group {
             const {pool} = require('./groups.js');
             const cardData = await profile.CardInfo();
             if(cardData){
+                conaole.log("SOMEHOW HIT THIS")
                 //insert a new group
                 //lets say you want to add another user or not when group is first created
                 const query = `WITH new_group AS (
@@ -197,6 +198,7 @@ class Group {
             }
         }catch(createError){
             console.log(createError)
+            console.log("HITTING ERROR")
             throw createError
         }
         
