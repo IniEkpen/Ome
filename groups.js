@@ -103,7 +103,7 @@ app.post('/users/group/create/:id', async (req, res) => {
             if (userList.length > 0){
                  console.log("CHECK2")
                 const role = 'member'
-                const check = await group.AddUsertoGroup(groupName,userList, role)
+                const check = await group.AddUsertoGroup(groupName,userList, username, role)
                 return res.status(200).json({'Group Created':true, 'Users Added':check})
             }
             //if there are users but they werent added//
