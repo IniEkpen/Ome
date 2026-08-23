@@ -70,8 +70,12 @@ class Profile {
         try{
             const {pool} = require('./groups.js');
             const card = await pool.query('SELECT card_info FROM users WHERE username =$1', [username])
-            if (card)
+            if (card){
+                console.log("AcTUALLY HIT A TRUE")
                 return true
+
+            }
+                
             else{
                 //card info doesnt exist or hasnt been filled out
                 return false
@@ -169,9 +173,9 @@ class Group {
         try {
             console.log("CHECK IF IT HIT CREATE GROUP")
             const {pool} = require('./groups.js');
-            const cardData = await profile.CardInfo();
+            const cardData = await profile.CardInfo(username);
             if(cardData){
-                conaole.log("SOMEHOW HIT THIS")
+                console.log("SOMEHOW HIT THIS")
                 //insert a new group
                 //lets say you want to add another user or not when group is first created
                 const query = `WITH new_group AS (
