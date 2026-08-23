@@ -77,8 +77,8 @@ class Profile {
                 return false
             }
         }catch(error){
-            console.log(Carderror)
-             throw Carderror
+            console.log("PRINTING OUT ERROR",Carderror)
+            throw Carderror
         }
         
 
@@ -262,6 +262,7 @@ class Group {
         
          try {
             const {pool} = require('./groups.js');
+            console.log(username)
             const check = await this.isOwner(groupName,username)
             const addList = {}
             if (check){
