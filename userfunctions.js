@@ -138,7 +138,8 @@ class Group {
 
     async isOwner(groupName, username){
         try{
-             const query = `
+            console.log("ENTERED is OWNER")
+             const owner = `
                 SELECT EXISTS (
                 SELECT 1
                 FROM groupmembers gm
@@ -150,8 +151,9 @@ class Group {
                 ) AS is_owner;
                 `
 
-            const result = await pool.query(query, [groupName, username]);
+            const result = await pool.query(owner, [groupName, username]);
             if (result.rows._isowner){
+                console.log("HITTING IS OWNER OR NO???")
                 return true
             }
             else{
