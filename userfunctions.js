@@ -256,7 +256,7 @@ class Group {
 
 
 
-    async AddUsertoGroup(groupName, userList, role) {
+    async AddUsertoGroup(groupName, userList, username, role) {
         //Add new user to existing Group?? might have to call checkgroups??
         //user has to be owner add user to group
         
@@ -337,5 +337,5 @@ class Group {
 }
 
 const profile = new Profile()
-const group = new Group();
+const group = new Group()
 module.exports = {profile, group}
