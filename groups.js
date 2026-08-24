@@ -103,14 +103,18 @@ app.post('/users/group/create/:id', async (req, res) => {
             if (userList.length > 0){
                  console.log("CHECK2")
                 const role = 'member'
-                const check = await group.AddUsertoGroup(groupName,userList, username, role)
-                return res.status(200).json({'Group Created':true, 'Users Added':check})
+                try{
+                    const check = await group.AddUsertoGroup(groupName,userList, username, role)
+                    return res.status(200).json({'Group Created':true, 'Users Added':check})
+                }catch(userError){
+                    return res.status(500).json({error:error.message, 'ERO':'error'})
+                }
+                
             }
             //if there are users but they werent added//
             else{
                 console.log("should reached this")
-                return res.status(200).json({'Group Created': true, 'Users Added': 'None'
-                })
+                return res.status(200).json({'Group Created': true, 'Users Added': 'None'})
             }
          
         }
@@ -119,7 +123,7 @@ app.post('/users/group/create/:id', async (req, res) => {
             return res.status(200).json({'Group Created': false})
         }
     }catch(error){
-        return res.status(500).json({error:error.message})
+        return res.status(500).json({error:error.message, 'ERO':'error'})
 
     }
 

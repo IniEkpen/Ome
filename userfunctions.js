@@ -26,9 +26,11 @@ class Profile {
         try{
             const {pool} = require('./groups.js');
             const exist = await pool.query('SELECT username FROM users WHERE username =$1', [username])
-            console.log("EXIST VALUE",exist)
-            if (exist.rowCount > 0)
+            if (exist.rowCount > 0){
                 return true
+
+            }
+                
             else{
                 return false
             }
@@ -106,7 +108,6 @@ class Profile {
 
 //Groups only have to apply to people that are owners of a group or want to join a group
 
-
 class Group {
     constructor(username){
         this.username = username
@@ -138,6 +139,7 @@ class Group {
 
     async isOwner(groupName, username){
         try{
+            console.log("ENTER IS OWNER FUCNTION")
             const {pool} = require('./groups.js');
             console.log("ENTERED is OWNER")
              const owner = `
@@ -153,14 +155,17 @@ class Group {
                 `
 
             const result = await pool.query(owner, [groupName, username]);
-            if (result.rows._isowner){
-                console.log("HITTING IS OWNER OR NO???")
+            console.log(result)
+            //FIX LATER SO ITS UNABLE TO INSERT NULL VALUE//
+            console.log("WHAT HAPPENED", result.rows[0].is_owner)
+            if (result.rows[0].is_owner){
                 return true
             }
             else{
                 return false
             }
         }catch(error){
+            console.log("FLASE TRUE")
             console.log(error)
             
         }
@@ -174,11 +179,9 @@ class Group {
     async CreateGroup(groupName, username) {
         //creates new group, making the person who created it the owner
         try {
-            console.log("CHECK IF IT HIT CREATE GROUP")
             const {pool} = require('./groups.js');
             const cardData = await profile.CardInfo(username);
             if(cardData){
-                console.log("SOMEHOW HIT THIS")
                 //insert a new group
                 //lets say you want to add another user or not when group is first created
                 const query = `WITH new_group AS (
@@ -191,6 +194,7 @@ class Group {
                 RETURNING group_id, user_id, role;`;
 
                 const result = await pool.query(query, [groupName, username]);
+                console.log("CHECKER",result)
                 if (result.rowCount > 0) {
                     console.log('IT WORKED')
                     return true
@@ -205,7 +209,6 @@ class Group {
             }
         }catch(createError){
             console.log(createError)
-            console.log("HITTING ERROR")
             throw createError
         }
         
@@ -275,11 +278,13 @@ class Group {
             const check = await this.isOwner(groupName,username)
             const addList = {}
             if (check){
-                let result =0
-                for (let i = 0; i < userList; i++) {
+                console.log("ABLE TO ENTER CHECK THE OWNER WORKED")
+                let result = 0
+                for (let i = 0; i < userList.length; i++) {
                     //check if each user is exist first(get profile)
-                        const profile = await GetProfile(userList[i])
-                        if (profile) {
+                        console.log("PRINTING USERS", userList[i])
+                        const person = await profile.GetProfile(userList[i])
+                        if (person) {
                             const query = `
                             INSERT INTO groupmembers (group_id, user_id, role)
                             SELECT g.id, u.id, $3
@@ -288,21 +293,22 @@ class Group {
                             AND u.username = $2
                             RETURNING group_id, user_id, role;
                             `
+                            console.log("TRUE PERSONS", person)
                             result = await pool.query(query, [groupName,userList[i], role]);
-                            console.log("Is IT WORKING")
+                            console.log("FIXING",result)
+                            if (result.rowCount > 0){
+                                addList[userList[i].toString()] = "added"
+                                console.log("Is IT WORKING")
+                            }
 
                         }
-                            
-                        if (result.rowsCount > 0){
-                            return addList[userList[i].toString()] = "added"
-                            console.log('WOrked AGaIN')
-
-                        }
+                        
                         else{
-                            return addList[userList[i].toString()] = "null"
+                            addList[userList[i].toString()] = "null"
                         }
 
                 }
+                return addList
              }
             
         }catch(createError){
@@ -346,6 +352,6 @@ class Group {
 
 }
 
-const profile = new Profile()
 const group = new Group()
+const profile = new Profile()
 module.exports = {profile, group}
