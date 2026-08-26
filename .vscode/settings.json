@@ -1,0 +1,20 @@
+{
+    "sqltools.connections": [
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": true
+                }
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "database": "ome_database",
+            "username": "root",
+            "name": "groupies",
+            "connectString": "postgresql://root:EWEgRxMfphzdQ3aRiFI0kELTRiNLwVRc@dpg-d9kqjplg1s2s73fiefhg-a.oregon-postgres.render.com/ome_database"
+        }
+    ],
+    "dart.debugSdkLibraries": true
+}

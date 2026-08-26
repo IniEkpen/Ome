@@ -1,4 +1,4 @@
-# omi
+# ome
 
 A new Flutter project.
 
