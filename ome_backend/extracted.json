@@ -1,0 +1,45 @@
+{
+  "merchant_name": "The Tack Room",
+  "date": "2024-04-08",
+  "items": [
+    {
+      "name": "BBQ Potato Chips",
+      "quantity": 1.0,
+      "price": 7.0
+    },
+    {
+      "name": "Diet Coke",
+      "quantity": 1.0,
+      "price": 3.0
+    },
+    {
+      "name": "Trillium Fort Point",
+      "quantity": 1.0,
+      "price": 10.0
+    },
+    {
+      "name": "Fried Chicken Sandwich",
+      "quantity": 2.0,
+      "price": 34.0
+    },
+    {
+      "name": "Famous Duck Grilled Cheese",
+      "quantity": 1.0,
+      "price": 25.0
+    },
+    {
+      "name": "Mac & Cheese",
+      "quantity": 1.0,
+      "price": 17.0
+    },
+    {
+      "name": "Burger of the moment",
+      "quantity": 1.0,
+      "price": 18.0
+    }
+  ],
+  "subtotal": 114.0,
+  "tax": 7.11,
+  "total": 124.53,
+  "payment_method": ""
+}
