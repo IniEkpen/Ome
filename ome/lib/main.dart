@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/gestures.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,7 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Yuwo',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -30,7 +32,14 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Yuwo'),
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+        }
+      )
     );
   }
 }
@@ -80,42 +89,104 @@ class _MyHomePageState extends State<MyHomePage> {
         // TRY THIS: Try changing the color here to a specific color (to
         // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
         // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.black,
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text(
+          widget.title,
+          style: GoogleFonts.courgette(fontSize: 24, color: Colors.white),
+        ),
       ),
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            // Column is also a layout widget. It takes a list of children and
+            // arranges them vertically. By default, it sizes itself to fit its
+            // children horizontally, and tries to be as tall as its parent.
+            //
+            // Column has various properties to control how it sizes itself and
+            // how it positions its children. Here we use mainAxisAlignment to
+            // center the children vertically; the main axis here is the vertical
+            // axis because Columns are vertical (the cross axis would be
+            // horizontal).
+            //
+            // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+            // action in the IDE, or press "p" in the console), to see the
+            // wireframe for each widget.
+            mainAxisAlignment: .center,
+            crossAxisAlignment: .start,
+
+            children: [
+              Align(
+                alignment: Alignment.center,
+                child: Text('Network Map',
+              style: GoogleFonts.courgette(fontSize: 24, color: Colors.white))),
+              Text(
+                'Splits to Complete',
+                style: GoogleFonts.courgette(fontSize: 24, color: Colors.white)),
+              const SplitList(),
+              Text(
+                'Finished Orders',
+                style: GoogleFonts.courgette(fontSize: 24, color: Colors.white)),
+              const SplitList(),
+            ],
+          ),
         ),
       ),
+      /* 
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,
         tooltip: 'Increment',
         child: const Icon(Icons.add),
+      ),*/
+      backgroundColor: const Color.fromARGB(237, 0, 0, 0),
+    ); 
+  }
+}
+
+class SplitList extends StatefulWidget {
+  const SplitList({super.key});
+
+  @override
+  State<SplitList> createState() => _SplitList();
+}
+
+
+class _SplitList extends State<SplitList> {
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SingleChildScrollView( 
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        spacing: 12.0,
+        children: List.generate(20, (i) => const SplitItem()),
+      )
+      )
+    );
+  }
+}
+
+
+class SplitItem extends StatelessWidget {
+  const SplitItem({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        height: 112,
+        width: 224,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 237, 234, 234),
+          borderRadius: BorderRadius.circular(8.0)
+        ),
       ),
     );
   }
