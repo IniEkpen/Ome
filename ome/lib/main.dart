@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: .fromSeed(seedColor: Colors.white),
       ),
       home: const MyHomePage(title: 'Yuwo'),
       scrollBehavior: const MaterialScrollBehavior().copyWith(
@@ -89,19 +89,20 @@ class _MyHomePageState extends State<MyHomePage> {
         // TRY THIS: Try changing the color here to a specific color (to
         // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
         // change color while the other colors stay the same.
-        backgroundColor: Colors.black,
+        backgroundColor: const Color.fromARGB(255, 240, 240, 240),
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
-        title: Text(
-          widget.title,
-          style: GoogleFonts.courgette(fontSize: 24, color: Colors.white),
-        ),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () {})
+        ]
       ),
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(30.0),
           child: Column(
             // Column is also a layout widget. It takes a list of children and
             // arranges them vertically. By default, it sizes itself to fit its
@@ -116,33 +117,34 @@ class _MyHomePageState extends State<MyHomePage> {
             // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
             // action in the IDE, or press "p" in the console), to see the
             // wireframe for each widget.
-            mainAxisAlignment: .center,
+            mainAxisAlignment: .start,
             crossAxisAlignment: .start,
 
             children: [
               Align(
                 alignment: Alignment.center,
                 child: Text('Network Map',
-              style: GoogleFonts.courgette(fontSize: 24, color: Colors.white))),
+              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold))),
+              SizedBox(height: 200.0),
               Text(
                 'Splits to Complete',
-                style: GoogleFonts.courgette(fontSize: 24, color: Colors.white)),
+                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold )),
               const SplitList(),
+              SizedBox(height: 20.0),
               Text(
                 'Finished Orders',
-                style: GoogleFonts.courgette(fontSize: 24, color: Colors.white)),
+                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
               const SplitList(),
             ],
           ),
         ),
       ),
-      /* 
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),*/
-      backgroundColor: const Color.fromARGB(237, 0, 0, 0),
+
+      backgroundColor: Color.fromARGB(255, 240, 240, 240),
+      bottomNavigationBar: NavigationBar(destinations: const <Widget>[
+        NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+        NavigationDestination(icon: Icon(Icons.explore), label:'Explore',)
+      ],),
     ); 
   }
 }
@@ -164,7 +166,7 @@ class _SplitList extends State<SplitList> {
       scrollDirection: Axis.horizontal,
       child: Row(
         spacing: 12.0,
-        children: List.generate(20, (i) => const SplitItem()),
+        children: List.generate(10, (i) => const SplitItem()),
       )
       )
     );
@@ -184,7 +186,7 @@ class SplitItem extends StatelessWidget {
         width: 224,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 237, 234, 234),
+          color: const Color.fromARGB(255, 255, 255, 255),
           borderRadius: BorderRadius.circular(8.0)
         ),
       ),
