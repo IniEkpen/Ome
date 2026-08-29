@@ -1,0 +1,5 @@
+com.flutter.stripe
+id googlePayButton
+layout stripe_react_native_google_pay_button
+style Theme_StripeReactNative_Transparent
+xml file_paths

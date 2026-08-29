@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start" :"node groups.js",
-    "dev" :"node groups.js",
+    "start": "node groups.js",
+    "dev": "node groups.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,10 +19,12 @@
   },
   "homepage": "https://github.com/IniEkpen/Ome#readme",
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.23.0",
     "pg-pool": "^3.14.0",
-    "process": "^0.11.10"
+    "process": "^0.11.10",
+    "stripe": "^14.0.0"
   }
 }

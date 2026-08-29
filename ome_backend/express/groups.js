@@ -6,10 +6,11 @@ const express = require('express')
 const app = express()
 const Stripe= require('stripe')
 const stripe = new Stripe(process.env.STRIPE_KEY)
+const cors = require('cors');
 console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
-    port:5432,
+    port:process.env.PORT,
     ssl:{
         require: true,
         rejectUnauthorized:false
@@ -21,6 +22,7 @@ const pool = new Pool({
 })
 module.exports = {pool};
 const {profile, group} = require('./userfunctions.js')
+app.use(cors());
 app.use(express.json())
 
 //checking if a user already exist in the system
@@ -274,6 +276,6 @@ app.get('/users/delete', async(req, res) => {
 });
 
 
-app.listen(3000,()=>{
+app.listen(process.env.PORT || 3000,()=>{
     console.log('The server is running')
 })
