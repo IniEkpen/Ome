@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_KEY)
 console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
-    port:5432,
+    port:process.env.PORT,
     ssl:{
         require: true,
         rejectUnauthorized:false
@@ -274,6 +274,6 @@ app.get('/users/delete', async(req, res) => {
 });
 
 
-app.listen(3000,()=>{
+app.listen(process.env.PORT || 3000,()=>{
     console.log('The server is running')
 })
