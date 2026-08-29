@@ -92,6 +92,9 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: const Color.fromARGB(255, 240, 240, 240),
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
+        title: Text(
+                  'Yuwo',
+                  style: GoogleFonts.courgette(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -103,47 +106,69 @@ class _MyHomePageState extends State<MyHomePage> {
         // in the middle of the parent.
         child: Padding(
           padding: EdgeInsets.all(30.0),
-          child: Column(
-            // Column is also a layout widget. It takes a list of children and
-            // arranges them vertically. By default, it sizes itself to fit its
-            // children horizontally, and tries to be as tall as its parent.
-            //
-            // Column has various properties to control how it sizes itself and
-            // how it positions its children. Here we use mainAxisAlignment to
-            // center the children vertically; the main axis here is the vertical
-            // axis because Columns are vertical (the cross axis would be
-            // horizontal).
-            //
-            // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-            // action in the IDE, or press "p" in the console), to see the
-            // wireframe for each widget.
-            mainAxisAlignment: .start,
-            crossAxisAlignment: .start,
+          child: SingleChildScrollView(
+            child: Column(
+              // Column is also a layout widget. It takes a list of children and
+              // arranges them vertically. By default, it sizes itself to fit its
+              // children horizontally, and tries to be as tall as its parent.
+              //
+              // Column has various properties to control how it sizes itself and
+              // how it positions its children. Here we use mainAxisAlignment to
+              // center the children vertically; the main axis here is the vertical
+              // axis because Columns are vertical (the cross axis would be
+              // horizontal).
+              //
+              // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+              // action in the IDE, or press "p" in the console), to see the
+              // wireframe for each widget.
+              mainAxisAlignment: .start,
+              crossAxisAlignment: .start,
 
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Text('Network Map',
-              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold))),
-              SizedBox(height: 200.0),
-              Text(
-                'Splits to Complete',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold )),
-              const SplitList(),
-              SizedBox(height: 20.0),
-              Text(
-                'Finished Orders',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
-              const SplitList(),
-            ],
-          ),
+              children: [
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    height: 200,
+                    width: 448,
+                    decoration: BoxDecoration (
+                      borderRadius: .circular(20),
+                      color: Colors.white
+                    ),
+                    padding: EdgeInsets.all(24),
+                    child: Align(
+                      alignment: .topLeft,
+                      child: Column(
+                      crossAxisAlignment: .start,
+                      children: [
+                        Text('You Owe', style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
+                        Text('Amount Owed', style: GoogleFonts.spaceGrotesk(fontSize: 9, color: const Color.fromARGB(255, 199, 198, 198), fontWeight: FontWeight.bold)),
+                        Text('\$$_counter', style: GoogleFonts.spaceGrotesk(fontSize: 50, color: Colors.black, fontWeight: FontWeight.bold))
+                      ],),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 50.0),
+                Text(
+                  'Splits to Complete',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold )),
+                const SplitList(),
+                SizedBox(height: 20.0),
+                Text(
+                  'Transactions',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
+                const SplitList(),
+              ],
+            ),
+          )
         ),
       ),
 
       backgroundColor: Color.fromARGB(255, 240, 240, 240),
       bottomNavigationBar: NavigationBar(destinations: const <Widget>[
         NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.explore), label:'Explore',)
+        NavigationDestination(icon: Icon(Icons.explore), label:'Network'),
+        NavigationDestination(icon: Icon(Icons.group), label:'Group'),
+        NavigationDestination(icon: Icon(Icons.person), label:'Profile'),
       ],),
     ); 
   }
