@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
+import 'home.dart';
 import 'dart:convert';
-import 'dart:ffi';
-import 'main.dart';
 
-typedef NativeCallbackSignature = Void Function(Int32 eventId);
+typedef NativeCallbackSignature = void Function(int eventId);
 typedef TEC = TextEditingController;
 
 Future<bool?> createAccount(TEC email, TEC phonenumber, TEC password, TEC username) async{
@@ -227,7 +225,7 @@ class _Accounting extends State<Account>{
                   if (account != null && account == true){
                     if (context.mounted){
                         Navigator.push(
-                          context,MaterialPageRoute(builder: (context) => const Home()),);
+                          context,MaterialPageRoute(builder: (context) => const MyHomePage(title:'Yuwo')),);
 
                     }
                   }
@@ -253,6 +251,3 @@ class _Accounting extends State<Account>{
   }
 
 }
-
-
-

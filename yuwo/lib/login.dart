@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:logger/logger.dart';
 import 'account.dart';
-import 'main.dart';
+import 'home.dart';
 
 typedef TEC = TextEditingController;
 
@@ -14,7 +13,7 @@ Future<bool?> fetchLogin(TEC username, TEC password) async{
   debugPrint("CHICKEN");
   debugPrint(username.text);
   debugPrint(password.text);
-   const url = 'https://ome-o9wx.onrender.com/users/signin';
+   const url = 'https://yuwo.onrender.com/users/signin';
     String userId = "12345";
     final uri = Uri.parse('$url/$userId');
     try{
@@ -50,7 +49,7 @@ Future<void> goAccount(BuildContext context, TEC username, TEC password) async {
    final bool? data = await fetchLogin(username,password);
    if (data == false){
     if(context.mounted){
-      Navigator.push(context, MaterialPageRoute(builder: (context)=> const Account()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=> const Account()));
 
 
     }
@@ -180,7 +179,7 @@ class _Profiling extends State<Profile>{
                     final check = await fetchLogin(username, password);
                     if(context.mounted){
                       if(check != null && check==true){
-                        Navigator.push(context,MaterialPageRoute(builder:(context)=> const Home()),);
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder:(context) => const MyHomePage(title:'Yuwo')),);
                       }
                     }
 
