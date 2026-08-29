@@ -3,10 +3,10 @@ dotenv.config()
 const port= 3000
 const Pool = require('pg-pool')
 const express = require('express')
-const app = express()/*
+const app = express()
 const Stripe= require('stripe')
 const stripe = new Stripe(process.env.STRIPE_KEY)
-*/
+const cors = require('cors');
 console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
@@ -22,6 +22,7 @@ const pool = new Pool({
 })
 module.exports = {pool};
 const {profile, group} = require('./userfunctions.js')
+app.use(cors());
 app.use(express.json())
 
 //checking if a user already exist in the system
