@@ -3,9 +3,10 @@ dotenv.config()
 const port= 3000
 const Pool = require('pg-pool')
 const express = require('express')
-const app = express()
+const app = express()/*
 const Stripe= require('stripe')
 const stripe = new Stripe(process.env.STRIPE_KEY)
+*/
 console.log("Database URL Exists:", !!process.env.DATABASE_URL);
 const pool = new Pool({
     connectionString:process.env.DATABASE_URL,
