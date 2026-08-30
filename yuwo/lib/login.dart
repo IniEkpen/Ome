@@ -203,7 +203,8 @@ class _Profiling extends State<Profile>{
                 ]
                
               )
-            ],))
+            ],),
+            ),
       )
 
     );
