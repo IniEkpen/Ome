@@ -20,7 +20,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  int _counter = 200;
 
   void _incrementCounter() {
     setState(() {
@@ -50,13 +50,16 @@ class _MyHomePageState extends State<MyHomePage> {
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
         title: Text(
-                  'Yuwo',
-                  style: GoogleFonts.courgette(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
+          'Yuwo',
+          style: GoogleFonts.courgette(
+            fontSize: 12,
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {})
-        ]
+          IconButton(icon: const Icon(Icons.notifications), onPressed: () {}),
+        ],
       ),
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
@@ -87,47 +90,72 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: Container(
                     height: 200,
                     width: 448,
-                    decoration: BoxDecoration (
+                    decoration: BoxDecoration(
                       borderRadius: .circular(20),
-                      color: Colors.white
+                      color: Colors.white,
                     ),
                     padding: EdgeInsets.all(24),
                     child: Align(
                       alignment: .topLeft,
                       child: Column(
-                      crossAxisAlignment: .start,
-                      children: [
-                        Text('You Owe', style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
-                        Text('Amount Owed', style: GoogleFonts.spaceGrotesk(fontSize: 9, color: const Color.fromARGB(255, 199, 198, 198), fontWeight: FontWeight.bold)),
-                        Text('\$$_counter', style: GoogleFonts.spaceGrotesk(fontSize: 50, color: Colors.black, fontWeight: FontWeight.bold))
-                      ],),
+                        crossAxisAlignment: .start,
+                        children: [
+                          Text(
+                            'You Owe',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 12,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Collective Amount Owed From Splits',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 9,
+                              color: const Color.fromARGB(255, 199, 198, 198),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            '\$$_counter',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 50,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 SizedBox(height: 50.0),
                 Text(
                   'Splits to Complete',
-                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold )),
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SplitList(),
                 SizedBox(height: 20.0),
                 Text(
                   'Transactions',
-                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SplitList(),
               ],
             ),
-          )
+          ),
         ),
       ),
-
-      backgroundColor: Color.fromARGB(255, 240, 240, 240),
-      bottomNavigationBar: NavigationBar(destinations: const <Widget>[
-        NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.explore), label:'Network'),
-        NavigationDestination(icon: Icon(Icons.group), label:'Group'),
-        NavigationDestination(icon: Icon(Icons.person), label:'Profile'),
-      ],),
-    ); 
+    );
   }
 }
 
@@ -138,27 +166,25 @@ class SplitList extends StatefulWidget {
   State<SplitList> createState() => _SplitList();
 }
 
-
 class _SplitList extends State<SplitList> {
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: SingleChildScrollView( 
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        spacing: 12.0,
-        children: List.generate(10, (i) => const SplitItem()),
-      )
-      )
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          spacing: 12.0,
+          children: List.generate(10, (i) => const SplitItem()),
+        ),
+      ),
     );
   }
 }
 
-
 class SplitItem extends StatelessWidget {
   const SplitItem({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -169,7 +195,7 @@ class SplitItem extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: const Color.fromARGB(255, 255, 255, 255),
-          borderRadius: BorderRadius.circular(8.0)
+          borderRadius: BorderRadius.circular(8.0),
         ),
       ),
     );
