@@ -5,8 +5,6 @@ CREATE TABLE users(
     phone VARCHAR(255),
     password TEXT,
     stripe_customer_id TEXT UNIQUE
-
-
 );
 
 
@@ -28,15 +26,11 @@ CREATE TABLE groups(
     created_by_user INT REFERENCES users(id)
 );
 
-
 CREATE TABLE groupmembers(
     id  SERIAL PRIMARY KEY,
     group_id INT REFERENCES groups(id),
     user_id INT REFERENCES users(id)
 );
-
-
-
 
 ALTER TABLE  groupmembers
 ADD COLUMN  role VARCHAR(50) NOT NULL DEFAULT 'member';
