@@ -35,7 +35,6 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.0
-<<<<<<< HEAD
   flutter_stripe_connect: ^0.3.7
   http: ^1.6.0
   gradient_borders: ^1.0.4
@@ -44,10 +43,8 @@ dependencies:
   plough: ^0.8.0
   flutter_randomcolor: ^1.0.18
   provider: ^6.1.5+1
-=======
   http: ^1.6.0
   google_sign_in: ^7.2.0
->>>>>>> dda7021bc84913b34ecea427bf4ac2877d4a41e5
 
 dev_dependencies:
   flutter_test:
