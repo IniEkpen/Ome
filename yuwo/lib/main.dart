@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/gestures.dart';
+import 'package:yuwo/account.dart';
+import 'login.dart';
+import 'payment.dart';
+import 'networkmap.dart';
+import 'groups/grouplogic.dart';
+import 'groups/groupdesign.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MaterialApp(
+    home:Network()
+  ));
+  /*Pay();*/
+  /*createAccount();*/
 }
 
 class MyApp extends StatelessWidget {

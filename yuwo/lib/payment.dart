@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe_connect/flutter_stripe_connect.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'main.dart';
 
 
 ///will add payment soon to call in other functions needs to connect to 
@@ -32,7 +33,9 @@ Future<void> setupStripe(BuildContext context) async{
     final stripeConnect = await StripeConnect.instance.initialize(
       publishableKey:'',
       clientSecretProvider: () async{
-      final http.Response postResponse= await http.post(uri);
+      final http.Response postResponse= await http.post(uri,
+      headers: {'Content-Type':'application/json; charset = UTF-8'},
+      body: jsonEncode({'username': 'john', 'email': 'john@gmail.com'}));
       final data = jsonDecode(postResponse.body);
       final clientSecret = data['client_secret'];
       return clientSecret;
@@ -56,8 +59,8 @@ Future<void> setupStripe(BuildContext context) async{
         title: Text('Payment Window')
       ),
       body:StripeAccountOnboarding(
-        onLoaded: ()=> print('Onboarding loaded'),
-        onLoadError:(error)=>print('')
+        onLoaded: ()=> ('Onboarding loaded'),
+        onLoadError:(error)=>('Error')
       )
     );
 
@@ -70,7 +73,6 @@ Future<void> setupStripe(BuildContext context) async{
 
 
 }
-
 
 
 

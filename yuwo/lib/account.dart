@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:ffi';
 import 'main.dart';
 
-typedef NativeCallbackSignature = Void Function(Int32 eventId);
+//typedef NativeCallbackSignature = Void Function(Int32 eventId);
 typedef TEC = TextEditingController;
+//TEC email, TEC phonenumber, TEC password, TEC username//
 
-Future<bool?> createAccount(TEC email, TEC phonenumber, TEC password, TEC username) async{
-   const url = 'https://ome-o9wx.onrender.com/users/createaccount';
+Future<bool?> createAccount() async{
+   const url ='https://yuwo.onrender.com/users/createaccount';
     String userId = "12345";
     final uri = Uri.parse('$url/$userId');
     try{
       final http.Response postResponse = await http.post(uri,
-      headers: {'Content-Type':'application/json; charset=UTF-8'},
-      //add to the profile from backend to the body
-      body:jsonEncode({'username':username.text,
-            'email':email.text,
-            'phone': phonenumber.text,
-            'password': password.text,
-            'stripe_customer_id':'14242q5qts'}));
+      headers: {'Content-Type': 'application/json; charset=UTF-8',}, 
+      body: jsonEncode({
+        'username': 'john', 
+        'email': 'john@gmail.com', 
+        'phone': '2143344554', 
+        'password': 'chicken_bruhhh', 
+        'stripe_customer_id': '14242q5qts'
+                                         }),
+      );
       if (postResponse.statusCode == 204){
           debugPrint('Post Success');
           return true;
@@ -30,11 +31,14 @@ Future<bool?> createAccount(TEC email, TEC phonenumber, TEC password, TEC userna
           return false;
         }
       }catch(error){
-      debugPrint('One of them errored');
-      rethrow;
+      debugPrint("check");
+      debugPrint(error.toString());
+      return null;
     }
 
 }
+
+/*
 
 class Account extends StatefulWidget{
   const Account({super.key});
@@ -222,16 +226,16 @@ class _Accounting extends State<Account>{
   
                     const SizedBox(height:16),
                     //Create Account
-                  SizedBox(child: ElevatedButton(onPressed:() async {
+                  SizedBox(child: ElevatedButton(onPressed:() {} /*async {
                     final account =await createAccount(email,phonenumber, password,username);
                   if (account != null && account == true){
                     if (context.mounted){
                         Navigator.push(
-                          context,MaterialPageRoute(builder: (context) => const Home()),);
+                          context,MaterialPageRoute(builder: (context) => const MyApp()),);
 
                     }
                   }
-                  }, child: Text("Create Account"))),
+                  }*/, child: Text("Create Account"))),
 
                     Row(children:[
                       Divider(color: Colors.grey,
@@ -255,4 +259,4 @@ class _Accounting extends State<Account>{
 }
 
 
-
+*/

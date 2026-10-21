@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:logger/logger.dart';
 import 'account.dart';
 import 'main.dart';
 
@@ -14,7 +13,7 @@ Future<bool?> fetchLogin(TEC username, TEC password) async{
   debugPrint("CHICKEN");
   debugPrint(username.text);
   debugPrint(password.text);
-   const url = 'https://ome-o9wx.onrender.com/users/signin';
+   const url = 'https://yuwo.onrender.com/users/signin';
     String userId = "12345";
     final uri = Uri.parse('$url/$userId');
     try{
@@ -48,7 +47,8 @@ Future<bool?> fetchLogin(TEC username, TEC password) async{
 Future<void> goAccount(BuildContext context, TEC username, TEC password) async {
    debugPrint('fetching data');
    final bool? data = await fetchLogin(username,password);
-   if (data == false){
+   /*if (data == false){
+    
     if(context.mounted){
       Navigator.push(context, MaterialPageRoute(builder: (context)=> const Account()));
 
@@ -57,7 +57,7 @@ Future<void> goAccount(BuildContext context, TEC username, TEC password) async {
     else{
       debugPrint('clicked off page');
     }
-   }
+   }*/
    if (data == true) {
     debugPrint("userExists Login successful");
     //later change to where it actually opens rest of pages
@@ -175,12 +175,12 @@ class _Profiling extends State<Profile>{
                     ],), 
                     const SizedBox(height:16),
                     //Login 
-                  SizedBox(child: ElevatedButton(onPressed:()async {
+                  SizedBox(child: ElevatedButton(onPressed:() async {
 
                     final check = await fetchLogin(username, password);
                     if(context.mounted){
                       if(check != null && check==true){
-                        Navigator.push(context,MaterialPageRoute(builder:(context)=> const Home()),);
+                        Navigator.push(context,MaterialPageRoute(builder:(context)=> MyApp()),);
                       }
                     }
 
