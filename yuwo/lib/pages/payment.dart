@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/* import 'package:flutter/material.dart';
 import 'package:flutter_stripe_connect/flutter_stripe_connect.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -76,4 +76,8 @@ Future<void> setupStripe(BuildContext context) async{
 
 
 
+<<<<<<< HEAD:yuwo/lib/payment.dart
+=======
+*/
+>>>>>>> dda7021bc84913b34ecea427bf4ac2877d4a41e5:yuwo/lib/pages/payment.dart
 
