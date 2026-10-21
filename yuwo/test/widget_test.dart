@@ -1,30 +1,94 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:yuwo/main.dart';
+import 'package:yuwo/services/api_client.dart';
+import 'package:yuwo/services/auth_service.dart';
 
-import '../lib/main.dart';
+AuthService _authWith(MockClientHandler handler) {
+  late final AuthService auth;
+  auth = AuthService(
+    client: ApiClient(
+      httpClient: MockClient(handler),
+      tokenProvider: () => auth.session?.token,
+    ),
+  );
+  return auth;
+}
+
+Future<void> _login(WidgetTester tester) async {
+  await tester.enterText(find.byType(TextFormField).at(0), 'george');
+  await tester.enterText(find.byType(TextFormField).at(1), 'Secret1!');
+  await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('signed-out users see the login page', (tester) async {
+    await tester.pumpWidget(
+      YuwoApp(auth: _authWith((_) async => http.Response('', 500))),
+    );
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Welcome Back'), findsOneWidget);
+    expect(find.text('You Owe'), findsNothing);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('empty form is not submitted', (tester) async {
+    var requests = 0;
+    await tester.pumpWidget(
+      YuwoApp(
+        auth: _authWith((_) async {
+          requests++;
+          return http.Response('', 200);
+        }),
+      ),
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
+    await tester.pumpAndSettle();
+
+    expect(requests, 0);
+    expect(find.text('Please enter your username'), findsOneWidget);
+  });
+
+  testWidgets('failed login shows a generic error', (tester) async {
+    await tester.pumpWidget(
+      YuwoApp(auth: _authWith((_) async => http.Response('', 500))),
+    );
+    await _login(tester);
+
+    expect(find.text('Incorrect username or password.'), findsOneWidget);
+    expect(find.text('You Owe'), findsNothing);
+  });
+
+  testWidgets('login sends password, shows home, logout returns', (
+    tester,
+  ) async {
+    late Map<String, dynamic> sent;
+    await tester.pumpWidget(
+      YuwoApp(
+        auth: _authWith((request) async {
+          sent = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode({'token': 'abc'}), 200);
+        }),
+      ),
+    );
+    await _login(tester);
+
+    expect(sent, {'username': 'george', 'password': 'Secret1!'});
+    expect(find.text('You Owe'), findsOneWidget);
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Log Out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome Back'), findsOneWidget);
   });
 }
