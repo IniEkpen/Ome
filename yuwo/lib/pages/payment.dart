@@ -75,9 +75,4 @@ Future<void> setupStripe(BuildContext context) async{
 }
 
 
-
-<<<<<<< HEAD:yuwo/lib/payment.dart
-=======
 */
->>>>>>> dda7021bc84913b34ecea427bf4ac2877d4a41e5:yuwo/lib/pages/payment.dart
-
