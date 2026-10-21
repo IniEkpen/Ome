@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+<<<<<<< HEAD
+import 'package:yuwo/account.dart';
+import 'login.dart';
+import 'payment.dart';
+import 'networkmap.dart';
+import 'groups/grouplogic.dart';
+import 'groups/groupdesign.dart';
+=======
 import 'pages/login.dart';
 import 'pages/home.dart';
+>>>>>>> dda7021bc84913b34ecea427bf4ac2877d4a41e5
 
 void main() {
-  runApp(const MyApp());
+  runApp(MaterialApp(
+    home:Network()
+  ));
+  /*Pay();*/
+  /*createAccount();*/
 }
 
 class MyApp extends StatelessWidget {
