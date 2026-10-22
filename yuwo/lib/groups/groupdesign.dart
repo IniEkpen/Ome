@@ -24,7 +24,7 @@ class Popups extends State<Popup> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.ink,
+      backgroundColor: AppColors.textSoft,
       titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,7 +46,7 @@ class Popups extends State<Popup> {
           cursorColor: AppColors.surface,
           decoration: InputDecoration(
             hintText: "add users",
-            fillColor: AppColors.inkSoft,
+            fillColor: AppColors.textSoft,
             prefixIcon: const Icon(Icons.search),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.control),

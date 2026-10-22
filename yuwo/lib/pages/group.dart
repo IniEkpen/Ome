@@ -1,189 +1,123 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/group_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/validators.dart';
 import '../widgets/common.dart';
 
-Future<Map<String, dynamic>?> createGroup() async {
-  
-   const url = 'https://ome-o9wx.onrender.com/users/group/payment';
-   String userId = "12345";
-   final uri = Uri.parse('$url/$userId');
-  try{
-      final http.Response payment = await http.post(uri,
-      headers: {'Content-Type':'application/json; charset=UTF-8'},
-      //add to the profile from backend to the body
-       body:jsonEncode({'username':'george'}));
-       //check if payment info has been added
-       debugPrint("chicken");
-      if (payment.statusCode==200){
-        final data =jsonDecode(payment.body);
-        final bool paycred = data['CardFilled'];
-        debugPrint(paycred.toString());
-        //also have to check if it works when info is filled out 
-        if (paycred){
-          debugPrint("it worked,yureka");
-          /* this is where I tested up to before*/
+class GroupsPage extends StatefulWidget {
+  const GroupsPage({super.key});
 
-          const url = 'https://ome-o9wx.onrender.com/users/group/create';
-          String userId = "12345";
-          final uri = Uri.parse('$url/$userId');
-          final http.Response postResponse = await http.post(uri,
-          headers: {'Content-Type':'application/json; charset=UTF-8'},
-          //add to the profile from backend to the body
-          body:jsonEncode({'username':'george', 
-                          'groupName': 'Vacay',
-                          'userList' : ['john', 'jason'],
-          }));
-
-          //check if group has been created and users has been added 
-          if (postResponse.statusCode==200 || postResponse.statusCode ==201){
-              debugPrint("entered the function");
-              final group = jsonDecode(postResponse.body);
-              debugPrint(group.toString());
-              final bool created = group['Group Created'];
-              debugPrint(created.toString());
-              if (created){
-                debugPrint("ENTERED CREATED");
-                final Map<String, dynamic> addUsers = group['Users Added'];
-                debugPrint(addUsers.toString());
-                /*more neat we can get right a loop in button or other function logic that checks if all
-                listed usernames could be added*/
-                return addUsers;
-
-              }
-              else{
-                debugPrint("GROUP WASNT CREATED");
-                return null;
-              }
-              
-          }
-          else{
-            debugPrint("unable to see if group was created and users were added");
-            return null;
-          }
-        }
-        return null;
-      }
-      else{
-        //navigate to payment page
-       /* if(context.mounted){
-          Navigator.push(context, MaterialPageRoute(builder: (context)=> const Pay()));
-          }
-        */
-        return null;
-        
-        }
-      
-      
-    }catch(paymentError){
-      debugPrint('unable to get payment info');
-      return null;
-    }
+  @override
+  State<GroupsPage> createState() => _GroupsPageState();
 }
 
-Future <void> deleteGroup() async {
-  const url = 'https://ome-o9wx.onrender.com/users/group/deletegroup';
-  String userId = "12345";
-  final uri = Uri.parse('$url/$userId');
-  try{
-    //initial are you sure message   
-    final http.Response delete = await http.get(uri);
-    if (delete.statusCode == 200){
-      
-      final http.Response deleteChoice = await http.post(uri,
-      headers: {'Content-Type':'application/json; charset=UTF-8'},
-      //add to the profile from backend to the body
-      body:jsonEncode({'username':'george', 'groupname': 'Vacay', 'choice': 'no'}));
-        if (delete.statusCode== 200){
-          final data = jsonDecode(deleteChoice.body);
-          final bool choice = data['choice'];
-          if (choice){
-            debugPrint('info was deleted');
-          }
-          else{
-            //if then 
-            debugPrint('user choice not to delete data');
-          }
-        }
-       else{
-        debugPrint("unable to get response");
-       }
-    }
-    
+class _GroupsPageState extends State<GroupsPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _groupName = TextEditingController();
+  final _members = TextEditingController();
+  bool _loading = false;
 
-    
-  }catch(delete){
-    debugPrint("unable to print info");
+  @override
+  void dispose() {
+    _groupName.dispose();
+    _members.dispose();
+    super.dispose();
   }
-}
-  
-Future<void> deleteuserfromGroup() async{
 
-}
+  List<String> get _memberList => _members.text
+      .split(',')
+      .map((m) => m.trim())
+      .where((m) => m.isNotEmpty)
+      .toSet()
+      .toList();
 
+  String? _validateMembers(String? _) {
+    for (final member in _memberList) {
+      if (Validators.username(member) != null) {
+        return '"$member" is not a valid username';
+      }
+    }
+    return null;
+  }
 
+  Future<void> _submit() async {
+    if (_loading || !_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await GroupService(
+        AuthScope.read(context),
+      ).createGroup(groupName: _groupName.text.trim(), members: _memberList);
+      if (!mounted) return;
+      showMessage(context, 'Group "${_groupName.text.trim()}" created');
+      _formKey.currentState!.reset();
+      _groupName.clear();
+      _members.clear();
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-class Group extends StatefulWidget{
-  const Group({super.key});
   @override
-  State<Group> createState()=> _Grouping();
-
-
-}
-
-class _Grouping extends State<Group>{
-  @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
+      appBar: const YuwoAppBar(),
+      body: PageBody(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.page),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text("Yuwo", style: AppText.brand),
-                  const SizedBox(height: AppSpacing.field),
-                  Text("Login", style: AppText.pageTitle),
-                  Text("Welcome Back ", style: AppText.caption),
-                ],
+          children: [
+            const SectionHeader(
+              'Your Groups',
+              subtitle: 'People you split costs with',
+            ),
+            const SizedBox(height: AppSpacing.field),
+            AppCard(
+              width: double.infinity,
+              child: Text(
+                'No groups yet',
+                style: AppText.body.copyWith(color: AppColors.hint),
               ),
             ),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page, 40, AppSpacing.page, AppSpacing.page,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(60),
-                    topRight: Radius.circular(60),
-                  ),
-                ),
-                child: CenteredContent(
-                  child: Column(
-                    children: const <Widget>[
-                      TextField(
-                        decoration: InputDecoration(
-                          hintText: "Username",
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
+            const SizedBox(height: AppSpacing.section),
+            const SectionHeader(
+              'Create a Group',
+              subtitle: 'A payment method is required to create a group',
+            ),
+            const SizedBox(height: AppSpacing.field),
+            AppCard(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _groupName,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(hintText: 'Group Name'),
+                      validator: Validators.name,
+                    ),
+                    const SizedBox(height: AppSpacing.field),
+                    TextFormField(
+                      controller: _members,
+                      autocorrect: false,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        hintText: 'Members (usernames, comma separated)',
                       ),
-                      SizedBox(height: AppSpacing.field),
-                      TextField(
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          hintText: "password",
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                      ),
-                    ],
-                  ),
+                      validator: _validateMembers,
+                    ),
+                    const SizedBox(height: AppSpacing.gap),
+                    LoadingButton(
+                      label: 'Create Group',
+                      loading: _loading,
+                      onPressed: _submit,
+                    ),
+                  ],
                 ),
               ),
             ),

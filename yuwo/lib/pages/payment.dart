@@ -75,6 +75,4 @@ Future<void> setupStripe(BuildContext context) async{
 }
 
 
-
 */
-

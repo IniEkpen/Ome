@@ -66,7 +66,7 @@ class _InviteCard extends StatelessWidget {
       height: 200,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.ink,
+        color: AppColors.textPrimary,
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
@@ -117,7 +117,7 @@ class _InviteCard extends StatelessWidget {
                       context.read<GroupsState>().respond(group.groupname, true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.ink,
+                    foregroundColor: AppColors.textPrimary,
                     minimumSize: const Size(0, 44),
                     shape: buttonShape,
                   ),
@@ -154,7 +154,7 @@ class _MemberStack extends StatelessWidget {
               left: i * 18,
               child: CircleAvatar(
                 radius: size / 2,
-                backgroundColor: AppColors.ink,
+                backgroundColor: AppColors.textPrimary,
                 child: CircleAvatar(
                   radius: size / 2 - 2,
                   backgroundColor: AppColors.groupCards[i % AppColors.groupCards.length].first,

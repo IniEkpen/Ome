@@ -1,230 +1,173 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'home.dart';
+
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/validators.dart';
+import '../widgets/auth_layout.dart';
 import '../widgets/common.dart';
-import 'dart:convert';
 
-typedef NativeCallbackSignature = void Function(int eventId);
-typedef TEC = TextEditingController;
+class CreateAccountPage extends StatefulWidget {
+  const CreateAccountPage({super.key});
 
-Future<bool?> createAccount(
-  TEC email,
-  TEC phonenumber,
-  TEC password,
-  TEC username,
-) async {
-  const url = 'https://ome-o9wx.onrender.com/users/createaccount';
-  String userId = "12345";
-  final uri = Uri.parse('$url/$userId');
-  try {
-    final http.Response postResponse = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json; charset=UTF-8'},
-      //add to the profile from backend to the body
-      body: jsonEncode({
-        'username': username.text,
-        'email': email.text,
-        'phone': phonenumber.text,
-        'password': password.text,
-        'stripe_customer_id': '14242q5qts',
-      }),
-    );
-    if (postResponse.statusCode == 204) {
-      debugPrint('Post Success');
-      return true;
-    } else {
-      debugPrint('Unsuccesfull post');
-      return false;
-    }
-  } catch (error) {
-    debugPrint('One of them errored');
-    rethrow;
-  }
-}
-
-class Account extends StatefulWidget {
-  const Account({super.key});
   @override
-  State<Account> createState() => _Accounting();
+  State<CreateAccountPage> createState() => _CreateAccountPageState();
 }
 
-class _Accounting extends State<Account> {
-  final TEC email = TEC();
-  final TEC password = TEC();
-  final TEC phonenumber = TEC();
-  final TEC first = TEC();
-  final TEC last = TEC();
-  final TEC username = TEC();
-  bool isVisible = false;
+class _CreateAccountPageState extends State<CreateAccountPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _username = TextEditingController();
+  final _email = TextEditingController();
+  final _phone = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _loading = false;
 
   @override
   void dispose() {
-    for (final c in [email, password, phonenumber, first, last, username]) {
+    for (final c in [
+      _first,
+      _last,
+      _username,
+      _email,
+      _phone,
+      _password,
+      _confirm,
+    ]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  // Same rule the original fields used.
-  String? _validate(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter password';
+  Future<void> _submit() async {
+    if (_loading || !_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await AuthScope.read(context).signup(
+        username: _username.text.trim(),
+        email: _email.text.trim(),
+        phone: _phone.text.replaceAll(RegExp(r'[\s\-()]'), ''),
+        password: _password.text,
+      );
+      // Signed in: drop back to the root so AuthGate shows the app and
+      // the sign-up form can't be returned to with the back button.
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-    final passReg = RegExp(
-      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String hint,
+    FormFieldValidator<String> validator, {
+    TextInputType? keyboardType,
+    Iterable<String>? autofillHints,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      autocorrect: false,
+      autofillHints: autofillHints,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(hintText: hint),
+      validator: validator,
     );
-    if (!passReg.hasMatch(value)) {
-      return 'Please enter valid password structure';
-    }
-    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     const gap = SizedBox(height: AppSpacing.field);
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.page,
-            vertical: 56,
-          ),
-          child: CenteredContent(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Yuwo', style: AppText.brandLarge),
-                const SizedBox(height: AppSpacing.section),
-                Text('Lets create an account', style: AppText.pageTitle),
-                const SizedBox(height: 4),
-                Text(
-                  'Split, send and settle up with friends',
-                  style: AppText.body.copyWith(color: AppColors.hint),
-                ),
-                const SizedBox(height: AppSpacing.gap),
-                AppCard(
-                  child: Form(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SectionHeader(
-                          'Your Details',
-                          subtitle: 'This is how friends will find you',
-                        ),
-                        const SizedBox(height: AppSpacing.gap),
-                        Row(
-                          children: [
-                            //FIRST NAME
-                            Expanded(
-                              child: TextFormField(
-                                controller: first,
-                                decoration: const InputDecoration(
-                                  hintText: 'First Name',
-                                ),
-                                validator: _validate,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.field),
-                            //LAST NAME
-                            Expanded(
-                              child: TextFormField(
-                                controller: last,
-                                decoration: const InputDecoration(
-                                  hintText: 'Last Name',
-                                ),
-                                validator: _validate,
-                              ),
-                            ),
-                          ],
-                        ),
-                        gap,
-                        //USERNAME
-                        TextFormField(
-                          controller: username,
-                          decoration: const InputDecoration(
-                            hintText: 'Username',
-                            prefixIcon: Icon(Icons.alternate_email),
-                          ),
-                          //COMEBACK FIX
-                          validator: _validate,
-                        ),
-                        gap,
-                        //EMAIL
-                        TextFormField(
-                          controller: email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            hintText: 'Email',
-                            prefixIcon: Icon(Icons.mail_outline),
-                          ),
-                          //COMEBACK FIX
-                          validator: _validate,
-                        ),
-                        gap,
-                        //PHONE NUMBER
-                        TextFormField(
-                          controller: phonenumber,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            hintText: 'Phone Number',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                          ),
-                          validator: _validate,
-                        ),
-                        gap,
-                        //PASSWORD
-                        TextFormField(
-                          obscureText: !isVisible,
-                          controller: password,
-                          decoration: InputDecoration(
-                            hintText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                isVisible
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                              ),
-                              onPressed: () =>
-                                  setState(() => isVisible = !isVisible),
-                            ),
-                          ),
-                          validator: _validate,
-                        ),
-                        const SizedBox(height: AppSpacing.gap),
-                        //Create Account
-                        ElevatedButton(
-                          onPressed: () async {
-                            final account = await createAccount(
-                              email,
-                              phonenumber,
-                              password,
-                              username,
-                            );
-                            if (account != null && account == true) {
-                              if (context.mounted) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const MyHomePage(title: 'Yuwo'),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          child: const Text('Create Account'),
-                        ),
-                      ],
+    return AuthLayout(
+      title: "Let's create an account",
+      subtitle: 'Split costs with friends in seconds',
+      form: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _field(
+                      _first,
+                      'First Name',
+                      Validators.name,
+                      autofillHints: const [AutofillHints.givenName],
                     ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: AppSpacing.field),
+                  Expanded(
+                    child: _field(
+                      _last,
+                      'Last Name',
+                      Validators.name,
+                      autofillHints: const [AutofillHints.familyName],
+                    ),
+                  ),
+                ],
+              ),
+              gap,
+              _field(
+                _username,
+                'Username',
+                Validators.username,
+                autofillHints: const [AutofillHints.newUsername],
+              ),
+              gap,
+              _field(
+                _email,
+                'Email',
+                Validators.email,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+              ),
+              gap,
+              _field(
+                _phone,
+                'Phone Number',
+                Validators.phone,
+                keyboardType: TextInputType.phone,
+                autofillHints: const [AutofillHints.telephoneNumber],
+              ),
+              gap,
+              PasswordField(
+                controller: _password,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.next,
+                validator: Validators.newPassword,
+              ),
+              gap,
+              PasswordField(
+                controller: _confirm,
+                hintText: 'Confirm Password',
+                autofillHints: const [AutofillHints.newPassword],
+                onFieldSubmitted: (_) => _submit(),
+                validator: (v) =>
+                    v == _password.text ? null : 'Passwords do not match',
+              ),
+              const SizedBox(height: AppSpacing.gap),
+              LoadingButton(
+                label: 'Create Account',
+                loading: _loading,
+                onPressed: _submit,
+              ),
+            ],
           ),
         ),
       ),
+      footer: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).maybePop(),
+          child: const Text('Already have an account? Login'),
+        ),
+      ],
     );
   }
 }

@@ -312,6 +312,7 @@ class _NetworkState extends State<Network>
 
               // Layer selection and privacy toggle.
               AppCard(
+                width: double.infinity,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
@@ -393,6 +394,7 @@ class _NetworkState extends State<Network>
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: AppCard(
+                    width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     radius: AppRadius.control,
                     child: SizedBox(
@@ -533,13 +535,13 @@ class _LayerChip extends StatelessWidget {
         height: 32,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.ink : AppColors.background,
+          color: selected ? AppColors.textPrimary : AppColors.background,
           borderRadius: BorderRadius.circular(AppRadius.tile),
         ),
         child: Text(
           '$layer',
           style: AppText.sectionTitle.copyWith(
-            color: selected ? AppColors.surface : AppColors.ink,
+            color: selected ? AppColors.surface : AppColors.textPrimary,
           ),
         ),
       ),
