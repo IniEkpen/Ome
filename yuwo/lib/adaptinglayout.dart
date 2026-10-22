@@ -1,28 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:plough/plough.dart' as gv;
 
-/// Picks force-directed physics based on how many nodes are in the graph,
-/// so small graphs stay tight and readable while larger ones get more room
-/// to spread out. Spacing is derived from the actual rendered node size
-/// (see [nodeDiameterFor]) rather than a flat constant, which is what keeps
-/// nodes from sitting on top of each other as the node count changes.
-///
-/// Force-directed layout is a physics simulation, not a hard constraint —
-/// it can't *guarantee* zero overlap the way a strict collision-avoidance
-/// pass would, especially in a very densely interlinked graph. What this
-/// does guarantee is that the repulsion is always sized correctly relative
-/// to how big the nodes are actually drawn, which is the part that was
-/// missing before and is what causes overlap in practice.
 gv.GraphLayoutStrategy adaptiveLayoutFor(int nodeCount) {
   final diameter = nodeDiameterFor(nodeCount);
 
-  // Minimum center-to-center distance for two circles of this diameter to
-  // have a clear gap between them, not just avoid touching.
+  // Minimum center-to-center distance for two circles of this diameter to avoid touching
   final minSpacing = diameter * 2.2;
 
-  // Coulomb repulsion strong enough, at that spacing, to actually win
-  // against the springs pulling linked nodes together — scaled off the
-  // node's rendered area so bigger nodes push harder.
+  // making Coulomb repulsion strong enough to win against the springs pulling linked nodes together 
   final coulombConstant = diameter * diameter * 6;
 
   if (nodeCount <= 3) {

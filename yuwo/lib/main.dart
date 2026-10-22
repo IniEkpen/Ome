@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-<<<<<<< HEAD
-import 'package:yuwo/account.dart';
-import 'login.dart';
-import 'payment.dart';
-import 'networkmap.dart';
-import 'groups/grouplogic.dart';
-import 'groups/groupdesign.dart';
-=======
 import 'pages/login.dart';
 import 'pages/home.dart';
->>>>>>> dda7021bc84913b34ecea427bf4ac2877d4a41e5
+import 'theme/app_theme.dart';
 
 void main() {
-  runApp(MaterialApp(
-    home:Network()
-  ));
+  // Network needs a NetworkRepository implementation before it can run here:
+  // runApp(MaterialApp(home: Network(repository: ..., viewerId: ...)));
+  runApp(const MyApp());
   /*Pay();*/
   /*createAccount();*/
 }
@@ -28,24 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Yuwo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.white),
-      ),
+      theme: AppTheme.light,
 
       debugShowCheckedModeBanner: false,
       home: const HomeScreen(),

@@ -37,8 +37,7 @@ class TransactionRecord {
   final String? note;
 }
 
-/// Only authorized transactions should reach this builder.
-/// The backend must enforce privacy independently.
+
 class TransactionGraphBuilder {
   TransactionGraphBuilder({
     required this.viewerId,
@@ -153,7 +152,7 @@ class TransactionGraphBuilder {
     return depth;
   }
 
-  // BFS shortest path using public transactions only.
+  // BFS shortest path using public transactions only
   List<String>? shortestPublicPath(
     String origin,
     String target,
@@ -199,7 +198,7 @@ class TransactionGraphBuilder {
     return null;
   }
 
-  // Construct a graph containing only visible transactions.
+  // Construct a graph containing only visible transactions
   gv.Graph visibleGraph({
     required int maxDepth,
     bool showMyPrivate = false,
@@ -254,7 +253,7 @@ class TransactionGraphBuilder {
       nodes[id] = node;
     }
 
-    // Group transactions between the same two users.
+    // Group transactions between the same two users
     final grouped =
         <String, List<TransactionRecord>>{};
 

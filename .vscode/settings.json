@@ -14,7 +14,21 @@
             "username": "root",
             "name": "groupies",
             "connectString": "postgresql://root:EWEgRxMfphzdQ3aRiFI0kELTRiNLwVRc@dpg-d9kqjplg1s2s73fiefhg-a.oregon-postgres.render.com/ome_database"
+        },
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": true
+                }
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "connectString": "postgresql://root:nEybM0jLpUXNOAStQfORSpdiwbFk1O9b@dpg-da8po96k1f9s739qe5jg-a.oregon-postgres.render.com/yuwo_odd0",
+            "name": "yuwo"
         }
     ],
-    "dart.debugSdkLibraries": true
+    "dart.debugSdkLibraries": true,
+    "cmake.sourceDirectory": "C:/Users/itore/Ome/Ome/yuwo/linux"
 }

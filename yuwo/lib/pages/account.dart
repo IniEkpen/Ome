@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'home.dart';
+import '../theme/app_theme.dart';
+import '../widgets/common.dart';
 import 'dart:convert';
 
 typedef NativeCallbackSignature = void Function(int eventId);
@@ -55,225 +57,171 @@ class _Accounting extends State<Account> {
   final TEC last = TEC();
   final TEC username = TEC();
   bool isVisible = false;
-  Icon passwordEye = Icon(Icons.visibility_off);
+
+  @override
+  void dispose() {
+    for (final c in [email, password, phonenumber, first, last, username]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  // Same rule the original fields used.
+  String? _validate(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter password';
+    }
+    final passReg = RegExp(
+      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
+    );
+    if (!passReg.hasMatch(value)) {
+      return 'Please enter valid password structure';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    const gap = SizedBox(height: AppSpacing.field);
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(top: 56, bottom: 46, left: 46, right: 46),
-          child: Column(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  /*Image(
-                    height: 150,
-                    image: AssetImage(),
-
-                ),*/
-                  Text("Lets create an account"),
-                  //add space between text
-                  const SizedBox(height: 16),
-                  Form(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32.0),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              //FIRST NAME
-                              Expanded(
-                                child: TextFormField(
-                                  controller: first,
-                                  decoration: InputDecoration(
-                                    hintText: "First Name",
-                                    hintStyle: TextStyle(color: Colors.grey),
-                                  ),
-                                  validator: (email) {
-                                    if (email == null || email.isEmpty) {
-                                      return 'Please enter password';
-                                    }
-                                    final passReg = RegExp(
-                                      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                                    );
-                                    if (!passReg.hasMatch(email)) {
-                                      return 'Please enter valid password structure';
-                                    }
-                                    return null;
-                                  },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.page,
+            vertical: 56,
+          ),
+          child: CenteredContent(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Yuwo', style: AppText.brandLarge),
+                const SizedBox(height: AppSpacing.section),
+                Text('Lets create an account', style: AppText.pageTitle),
+                const SizedBox(height: 4),
+                Text(
+                  'Split, send and settle up with friends',
+                  style: AppText.body.copyWith(color: AppColors.hint),
+                ),
+                const SizedBox(height: AppSpacing.gap),
+                AppCard(
+                  child: Form(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SectionHeader(
+                          'Your Details',
+                          subtitle: 'This is how friends will find you',
+                        ),
+                        const SizedBox(height: AppSpacing.gap),
+                        Row(
+                          children: [
+                            //FIRST NAME
+                            Expanded(
+                              child: TextFormField(
+                                controller: first,
+                                decoration: const InputDecoration(
+                                  hintText: 'First Name',
                                 ),
+                                validator: _validate,
                               ),
-
-                              //LAST NAME
-                              Expanded(
-                                child: TextFormField(
-                                  controller: last,
-                                  decoration: InputDecoration(
-                                    hintText: "Last Name",
-                                    hintStyle: TextStyle(color: Colors.grey),
-                                  ),
-                                  validator: (last) {
-                                    if (last == null || last.isEmpty) {
-                                      return 'Please enter password';
-                                    }
-                                    final passReg = RegExp(
-                                      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                                    );
-                                    if (!passReg.hasMatch(last)) {
-                                      return 'Please enter valid password structure';
-                                    }
-                                    return null;
-                                  },
+                            ),
+                            const SizedBox(width: AppSpacing.field),
+                            //LAST NAME
+                            Expanded(
+                              child: TextFormField(
+                                controller: last,
+                                decoration: const InputDecoration(
+                                  hintText: 'Last Name',
                                 ),
-                              ),
-                            ],
-                          ),
-                          //USERNAME
-                          TextFormField(
-                            controller: username,
-                            decoration: InputDecoration(
-                              hintText: "Username",
-                              hintStyle: TextStyle(color: Colors.grey),
-                            ),
-                            //COMEBACK FIX
-                            validator: (username) {
-                              if (username == null || username.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              final passReg = RegExp(
-                                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                              );
-                              if (!passReg.hasMatch(username)) {
-                                return 'Please enter valid password structure';
-                              }
-                              return null;
-                            },
-                          ),
-                          //EMAIL
-                          TextFormField(
-                            controller: email,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              hintText: "Email",
-                              hintStyle: TextStyle(color: Colors.grey),
-                            ),
-                            //COMEBACK FIX
-                            validator: (email) {
-                              if (email == null || email.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              final passReg = RegExp(
-                                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                              );
-                              if (!passReg.hasMatch(email)) {
-                                return 'Please enter valid password structure';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          //PHONE NUMBER
-                          TextFormField(
-                            controller: phonenumber,
-                            keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: "Phone Number",
-                              hintStyle: TextStyle(color: Colors.grey),
-                            ),
-                            validator: (phonenumber) {
-                              if (phonenumber == null || phonenumber.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              final passReg = RegExp(
-                                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                              );
-                              if (!passReg.hasMatch(phonenumber)) {
-                                return 'Please enter valid password structure';
-                              }
-                              return null;
-                            },
-                          ),
-                          //PASSWORD
-                          TextFormField(
-                            obscureText: isVisible ? false : true,
-                            controller: password,
-                            decoration: InputDecoration(
-                              hintText: "Password",
-                              hintStyle: TextStyle(color: Colors.grey),
-                              suffixIcon: IconButton(
-                                icon: passwordEye,
-                                onPressed: () {
-                                  setState(() {
-                                    isVisible = !isVisible;
-                                    if (isVisible) {
-                                      passwordEye = Icon(Icons.visibility);
-                                    } else {
-                                      passwordEye = Icon(Icons.visibility);
-                                    }
-                                  });
-                                },
+                                validator: _validate,
                               ),
                             ),
-                            validator: (password) {
-                              if (password == null || password.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              final passReg = RegExp(
-                                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                              );
-                              if (!passReg.hasMatch(password)) {
-                                return 'Please enter valid password structure';
-                              }
-                              return null;
-                            },
+                          ],
+                        ),
+                        gap,
+                        //USERNAME
+                        TextFormField(
+                          controller: username,
+                          decoration: const InputDecoration(
+                            hintText: 'Username',
+                            prefixIcon: Icon(Icons.alternate_email),
                           ),
-
-                          const SizedBox(height: 16),
-                          //Create Account
-                          SizedBox(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                final account = await createAccount(
-                                  email,
-                                  phonenumber,
-                                  password,
-                                  username,
+                          //COMEBACK FIX
+                          validator: _validate,
+                        ),
+                        gap,
+                        //EMAIL
+                        TextFormField(
+                          controller: email,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            hintText: 'Email',
+                            prefixIcon: Icon(Icons.mail_outline),
+                          ),
+                          //COMEBACK FIX
+                          validator: _validate,
+                        ),
+                        gap,
+                        //PHONE NUMBER
+                        TextFormField(
+                          controller: phonenumber,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            hintText: 'Phone Number',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                          validator: _validate,
+                        ),
+                        gap,
+                        //PASSWORD
+                        TextFormField(
+                          obscureText: !isVisible,
+                          controller: password,
+                          decoration: InputDecoration(
+                            hintText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                isVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () =>
+                                  setState(() => isVisible = !isVisible),
+                            ),
+                          ),
+                          validator: _validate,
+                        ),
+                        const SizedBox(height: AppSpacing.gap),
+                        //Create Account
+                        ElevatedButton(
+                          onPressed: () async {
+                            final account = await createAccount(
+                              email,
+                              phonenumber,
+                              password,
+                              username,
+                            );
+                            if (account != null && account == true) {
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MyHomePage(title: 'Yuwo'),
+                                  ),
                                 );
-                                if (account != null && account == true) {
-                                  if (context.mounted) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const MyHomePage(title: 'Yuwo'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                              child: Text("Create Account"),
-                            ),
-                          ),
-
-                          Row(
-                            children: [
-                              Divider(
-                                color: Colors.grey,
-                                thickness: 0.5,
-                                indent: 60,
-                                endIndent: 5,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                              }
+                            }
+                          },
+                          child: const Text('Create Account'),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

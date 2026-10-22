@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../theme/app_theme.dart';
+import '../widgets/common.dart';
 
 Future<Map<String, dynamic>?> createGroup() async {
   
@@ -133,110 +135,61 @@ class Group extends StatefulWidget{
 class _Grouping extends State<Group>{
   @override
   Widget build(BuildContext context){
-     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors:[
-            Colors.red[900]!,
-            Colors.red[800]!,
-            Colors.red[400]!
-          ]
-          )
-          ),
-          child: Column (
-            children: <Widget> [
-            Column(
-         
-              children: <Widget>[
-                Text("Login",
-                style:TextStyle(
-                  color:Colors.white,
-                  fontSize: 40
-                )
-                ),
-                Text("Welcome Back ",
-                  style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20
-                  )
-                )
-              ]
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.page),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text("Yuwo", style: AppText.brand),
+                  const SizedBox(height: AppSpacing.field),
+                  Text("Login", style: AppText.pageTitle),
+                  Text("Welcome Back ", style: AppText.caption),
+                ],
+              ),
             ),
             Expanded(
               child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(60), topRight: Radius.circular(60))
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.page, 40, AppSpacing.page, AppSpacing.page,
                 ),
-              child: Column(
-                children: <Widget> [
-                  Container(
-                    height: 100,
-                    width: double.infinity,
-                    transform: Matrix4.translationValues(0, 100, 0),
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color:Colors.grey[200]!)) ,
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10), bottomLeft: Radius.circular(10), bottomRight: Radius.circular(10)  ),
-                      boxShadow: [BoxShadow(
-                        blurRadius:20,
-                        color: Color.fromRGBO(255, 0, 0,3),
-                        offset:Offset(0,10)
-                        )
-                        ]
-                    ),
-                   
-                    child:TextFormField(
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                      hintText: "Username",
-                      hintStyle: TextStyle(color: Colors.grey)
-                      )
-                     
-                    ),
-                   
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(60),
+                    topRight: Radius.circular(60),
                   ),
-                  Container(
-                    height: 100,
-                    width: double.infinity,
-                    transform: Matrix4.translationValues(0, 110, 0),
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color:Colors.grey[200]!)) ,
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10), bottomLeft: Radius.circular(10), bottomRight: Radius.circular(10)  ),
-                      boxShadow: [BoxShadow(
-                        blurRadius:20,
-                        color: Color.fromRGBO(255, 0, 0,3),
-                        offset:Offset(0,10)
-                        )
-                        ]
-                    ),
-                   
-                    child:TextFormField(
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                      hintText: "password",
-                      hintStyle: TextStyle(color: Colors.grey)
-                      )
-                     
-                    )
-                  )
-
-
-                ]
-              )
-             
+                ),
+                child: CenteredContent(
+                  child: Column(
+                    children: const <Widget>[
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: "Username",
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.field),
+                      TextField(
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: "password",
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              )
-           
-          ]
-          )
-         
-         
-        )
+            ),
+          ],
+        ),
+      ),
     );
   }
-
-
 }

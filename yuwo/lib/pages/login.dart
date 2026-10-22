@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'account.dart';
 import 'home.dart';
+import '../theme/app_theme.dart';
+import '../widgets/common.dart';
 
 typedef TEC = TextEditingController;
 
@@ -78,139 +80,155 @@ class _Profiling extends State<Profile> {
   final TEC username = TEC();
   final TEC password = TEC();
   bool isVisible = false;
-  Icon passwordEye = const Icon(Icons.visibility_off);
+  bool rememberMe = true;
+
+  @override
+  void dispose() {
+    username.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(top: 56, bottom: 46, left: 46, right: 46),
-          child: Column(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Welcome Back"),
-                  //add space between text
-                  const SizedBox(height: 16),
-                  Text("Change the way you handle money"),
-
-                  Form(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32.0),
-                      child: Column(
-                        children: [
-                          //email
-                          TextFormField(
-                            controller: username,
-                            decoration: InputDecoration(
-                              hintText: "Username",
-                              hintStyle: TextStyle(color: Colors.grey),
-                            ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.page,
+            vertical: 56,
+          ),
+          child: CenteredContent(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Yuwo', style: AppText.brandLarge),
+                const SizedBox(height: AppSpacing.section),
+                Text('Welcome Back', style: AppText.pageTitle),
+                const SizedBox(height: 4),
+                Text(
+                  'Change the way you handle money',
+                  style: AppText.body.copyWith(color: AppColors.hint),
+                ),
+                const SizedBox(height: AppSpacing.gap),
+                AppCard(
+                  child: Form(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SectionHeader(
+                          'Sign In',
+                          subtitle: 'Use your Yuwo username and password',
+                        ),
+                        const SizedBox(height: AppSpacing.gap),
+                        TextFormField(
+                          controller: username,
+                          decoration: const InputDecoration(
+                            hintText: 'Username',
+                            prefixIcon: Icon(Icons.person_outline),
                           ),
-
-                          TextFormField(
-                            controller: password,
-                            obscureText: isVisible ? false : true,
-                            decoration: InputDecoration(
-                              hintText: "Password",
-                              hintStyle: TextStyle(color: Colors.grey),
-                              suffixIcon: IconButton(
-                                icon: passwordEye,
-                                onPressed: () {
-                                  setState(() {
-                                    isVisible = !isVisible;
-                                    if (isVisible) {
-                                      passwordEye = Icon(Icons.visibility);
-                                    } else {
-                                      passwordEye = Icon(Icons.visibility_off);
-                                    }
-                                  });
-                                },
+                        ),
+                        const SizedBox(height: AppSpacing.field),
+                        TextFormField(
+                          controller: password,
+                          obscureText: !isVisible,
+                          decoration: InputDecoration(
+                            hintText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                isVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
                               ),
-                            ),
-                            validator: (password) {
-                              if (password == null || password.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              final passReg = RegExp(
-                                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-                              );
-                              if (!passReg.hasMatch(password)) {
-                                return 'Please enter valid password structure';
-                              }
-                              return null;
-                            },
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              //Rememeber password
-                              Row(
-                                children: [
-                                  Checkbox(value: true, onChanged: (value) {}),
-                                  Text("Remember Me"),
-                                  TextButton(
-                                    onPressed: () {},
-                                    child: Text("Forgot Password"),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          //Login
-                          SizedBox(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                final check = await _fetchLogin(
-                                  username,
-                                  password,
-                                );
-                                if (context.mounted) {
-                                  if (check != null && check == true) {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const MyHomePage(title: 'Yuwo'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                              child: Text("Login"),
+                              onPressed: () =>
+                                  setState(() => isVisible = !isVisible),
                             ),
                           ),
-
-                          //Create Account
-                          SizedBox(
-                            child: OutlinedButton(
+                          validator: (password) {
+                            if (password == null || password.isEmpty) {
+                              return 'Please enter password';
+                            }
+                            final passReg = RegExp(
+                              r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
+                            );
+                            if (!passReg.hasMatch(password)) {
+                              return 'Please enter valid password structure';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 4),
+                        //Remember password
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: rememberMe,
+                              onChanged: (value) =>
+                                  setState(() => rememberMe = value ?? false),
+                            ),
+                            Text('Remember Me', style: AppText.sectionTitle),
+                            const Spacer(),
+                            TextButton(
                               onPressed: () {},
-                              child: Text("Create Account"),
+                              child: const Text('Forgot Password'),
                             ),
-                          ),
-
-                          Row(
-                            children: [
-                              Divider(
-                                color: Colors.grey,
-                                thickness: 0.5,
-                                indent: 60,
-                                endIndent: 5,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.field),
+                        //Login
+                        ElevatedButton(
+                          onPressed: () async {
+                            final check = await _fetchLogin(username, password);
+                            if (context.mounted) {
+                              if (check != null && check == true) {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MyHomePage(title: 'Yuwo'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('Login'),
+                        ),
+                        const SizedBox(height: AppSpacing.field),
+                        const _OrDivider(),
+                        const SizedBox(height: AppSpacing.field),
+                        //Create Account
+                        OutlinedButton(
+                          onPressed: () {},
+                          child: const Text('Create Account'),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: AppColors.divider)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('OR', style: AppText.caption),
+        ),
+        const Expanded(child: Divider(color: AppColors.divider)),
+      ],
     );
   }
 }
