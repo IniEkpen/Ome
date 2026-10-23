@@ -43,7 +43,6 @@ dependencies:
   plough: ^0.8.0
   flutter_randomcolor: ^1.0.18
   provider: ^6.1.5+1
-  http: ^1.6.0
   google_sign_in: ^7.2.0
 
 dev_dependencies:

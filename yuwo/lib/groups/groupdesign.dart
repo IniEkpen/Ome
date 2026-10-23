@@ -1,5 +1,7 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
+import "../theme/app_theme.dart";
+import "../widgets/common.dart";
 import "groupstate.dart";
 import "grouplists.dart";
 import "joinedgroups.dart";
@@ -11,7 +13,7 @@ class Group extends StatefulWidget {
 }
 
 // When a user clicks create group button pop up should take up screen..to add groups users
-// NOTE: left exactly as you had it -- you said you'll fix this later.
+// NOTE: behaviour left as you had it -- you said you'll fix this later. Only the styling changed.
 class Popup extends StatefulWidget {
   const Popup({super.key});
   @override
@@ -22,19 +24,35 @@ class Popups extends State<Popup> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text("Create A Group", style: TextStyle(color: Colors.white)),
-      content: Container(
-        alignment: Alignment.topRight,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.black,
-            border: Border.all(color: Colors.white, width: 3.0)),
+      backgroundColor: AppColors.textSoft,
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Create A Group",
+            style: AppText.pageTitle.copyWith(
+              color: AppColors.surface,
+              fontSize: 22,
+            ),
+          ),
+          Text("Search friends to add to your group", style: AppText.caption),
+        ],
+      ),
+      content: SizedBox(
+        width: AppSpacing.contentMaxWidth,
         child: TextField(
-          style: TextStyle(color: Colors.white),
+          style: AppText.body.copyWith(color: AppColors.surface),
+          cursorColor: AppColors.surface,
           decoration: InputDecoration(
-              hintText: "add users",
-              hintStyle: TextStyle(color: Colors.grey),
-              prefixIcon: Icon(Icons.search)),
+            hintText: "add users",
+            fillColor: AppColors.textSoft,
+            prefixIcon: const Icon(Icons.search),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              borderSide: const BorderSide(color: AppColors.surface),
+            ),
+          ),
         ),
       ),
     );
@@ -49,34 +67,64 @@ class _Grouping extends State<Group> {
     return ChangeNotifierProvider(
       create: (_) => GroupsState()..loadAll(),
       child: Scaffold(
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                height: 200,
-                alignment: Alignment.topRight,
-                child: FloatingActionButton(
-                  onPressed: () => showDialog(
-                      context: context, builder: (BuildContext context) => const Popup()),
-                  child: Icon(Icons.add),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.page),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Yuwo", style: AppText.brand),
+                          const SizedBox(height: AppSpacing.field),
+                          Text("Groups", style: AppText.pageTitle),
+                          Text(
+                            "Split costs with the people you share them with",
+                            style: AppText.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                    FloatingActionButton(
+                      tooltip: "Create group",
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (BuildContext context) => const Popup(),
+                      ),
+                      child: const Icon(Icons.add),
+                    ),
+                  ],
                 ),
-              ),
 
-              // Un-commented: was previously disabled, now shows pending invites.
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: GroupInvite(),
-              ),
+                const SizedBox(height: AppSpacing.section),
 
-              SizedBox(width: double.infinity, height: 40),
+                // Pending invites.
+                const SectionHeader(
+                  "Invites",
+                  subtitle: "Groups waiting on your answer",
+                ),
+                const SizedBox(height: AppSpacing.field),
+                const SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  child: GroupInvite(),
+                ),
 
-              Text("Groups", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: AppSpacing.section),
 
-              SizedBox(width: double.infinity, height: 10),
-
-              SizedBox(height: 245, child: Joined()),
-            ],
+                const SectionHeader(
+                  "Groups",
+                  subtitle: "Groups you've joined",
+                ),
+                const SizedBox(height: AppSpacing.field),
+                const Joined(),
+              ],
+            ),
           ),
         ),
       ),

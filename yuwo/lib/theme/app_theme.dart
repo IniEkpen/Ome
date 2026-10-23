@@ -11,6 +11,23 @@ abstract final class AppColors {
   static const textMuted = Color.fromARGB(255, 199, 198, 198);
   static const hint = Color.fromARGB(255, 158, 158, 158);
   static const error = Color.fromARGB(255, 179, 38, 30);
+  static const textSoft = Color.fromARGB(255, 28, 28, 30);
+  static const divider = Color.fromARGB(255, 228, 228, 228);
+
+  // Network map colours, matching the ones transactiongraph.dart assigns.
+  static const viewer = Color(0xFF477ED5);
+  static const contact = Color(0xFF52A98D);
+  static const path = Color(0xFF16A085);
+  static const private = Color(0xFF9D7BD8);
+
+  // Joined group cards cycle through these, starting with the original orange.
+  static const groupCards = <List<Color>>[
+    [Color(0xFFFF9F43), Color(0xFFFF7A1A)],
+    [Color(0xFF2D2D30), Color(0xFF000000)],
+    [Color(0xFF52A98D), Color(0xFF16A085)],
+    [Color(0xFF6C8FE0), Color(0xFF477ED5)],
+    [Color(0xFFB59BE6), Color(0xFF9D7BD8)],
+  ];
 }
 
 abstract final class AppRadius {

@@ -33,8 +33,8 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.22),
-                blurRadius: 10,
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
             ],
