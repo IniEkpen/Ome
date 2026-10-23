@@ -1,5 +1,6 @@
 package com.example.yuwo
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity is required by Stripe's PaymentSheet (flutter_stripe).
+class MainActivity : FlutterFragmentActivity()

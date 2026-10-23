@@ -1,240 +1,103 @@
-//Groups only have to apply to people that are owners of a group or want to join a group
+// Groups are addressed by id (names aren't unique). Membership rows carry a
+// role ('owner' | 'member') and a status ('pending' invite | 'accepted').
+const { pool, withTransaction } = require('../db')
 
 class Group {
     constructor(pool) {
-        this.pool = pool;
-    }
-    async checkGroups(username) {
-        // Send back owner of all groups
-        try {
-            const query = `SELECT g.id, g.group_name
-            FROM groups g
-            JOIN groupmembers gm ON gm.group_id = g.id
-            JOIN users u ON u.id = gm.user_id
-            WHERE u.username = $1
-            AND gm.role = 'owner';
-            `;
-            const check = await pool.query(query, [username]);
-            console.log(check)
-            if (check != null)
-                return check
-            else {
-                return null
-            }
-
-        } catch (checkError) {
-            console.log(checkError)
-        }
+        this.pool = pool
     }
 
-    async isOwner(groupName, username) {
-        try {
-            console.log("ENTER IS OWNER FUNCTION")
-            const { pool } = require('./app.js');
-            console.log("ENTERED is OWNER")
-            const owner = `
-                SELECT EXISTS (
-                SELECT 1
-                FROM groupmembers gm
-                JOIN groups g ON g.id = gm.group_id
-                JOIN users u ON u.id = gm.user_id
-                WHERE g.group_name = $1
-                AND u.username = $2
-                AND gm.role = 'owner'
-                ) AS is_owner;
-                `
-
-            const result = await pool.query(owner, [groupName, username]);
-            console.log(result)
-            //FIX LATER SO ITS UNABLE TO INSERT NULL VALUE//
-            console.log("WHAT HAPPENED", result.rows[0].is_owner)
-            if (result.rows[0].is_owner) {
-                return true
-            }
-            else {
-                return false
-            }
-        } catch (error) {
-            console.log("FLASE TRUE")
-            console.log(error)
-
-        }
+    // Every group the user owns, joined or was invited to, with member names.
+    async ListForUser(userId) {
+        const query = `
+            SELECT g.id, g.group_name, me.role, me.status,
+                   COALESCE(array_agg(u.username ORDER BY u.username)
+                            FILTER (WHERE other.status = 'accepted'), '{}') AS people,
+                   EXISTS (SELECT 1 FROM splits s WHERE s.group_id = g.id AND s.status = 'claiming') AS has_open_split
+            FROM groupmembers me
+            JOIN groups g ON g.id = me.group_id
+            JOIN groupmembers other ON other.group_id = g.id
+            JOIN users u ON u.id = other.user_id
+            WHERE me.user_id = $1
+            GROUP BY g.id, g.group_name, me.role, me.status
+            ORDER BY g.id DESC;`
+        const result = await this.pool.query(query, [userId])
+        return result.rows
     }
 
-
-
-
-
-
-    async CreateGroup(groupName, username) {
-        //creates new group, making the person who created it the owner
-        try {
-            const { pool } = require('./app.js');
-            const cardData = await profile.CardInfo(username);
-            if (cardData) {
-                //insert a new group
-                //lets say you want to add another user or not when group is first created
-                const query = `WITH new_group AS (
-                INSERT INTO groups (group_name, created_by_user)
-                SELECT $1, id FROM users WHERE username = $2
-                RETURNING id)
-                INSERT INTO groupmembers (group_id, user_id, role)
-                SELECT new_group.id, (SELECT id FROM users WHERE username = $2), 'owner'
-                FROM new_group
-                RETURNING group_id, user_id, role;`;
-
-                const result = await pool.query(query, [groupName, username]);
-                console.log("CHECKER", result)
-                if (result.rowCount > 0) {
-                    console.log('IT WORKED')
-                    return true
-                }
-                else {
-                    throw new Error("no user records were updated")
-                }
-
-            }
-            else {
-                return false
-            }
-        } catch (createError) {
-            console.log(createError)
-            throw createError
-        }
-
-    }
-    async LeaveGroup(username, groupName) {
-        try {
-            const owner = await this.isOwner()
-            if (isOwner) {
-                const group = await this.DeleteUserFromGroup(username, groupName)
-            }
-            const deleted = await this.DeleteGroup(username, groupName)
-            if (deleted) {
-                return true
-            }
-            else {
-                return false
-            }
-        } catch (LeaveError) {
-            console.log(LeaveError)
-            throw LeaveError
-
-        }
-
-
-
-
+    async GetMembership(groupId, userId) {
+        const result = await this.pool.query(
+            'SELECT role, status FROM groupmembers WHERE group_id = $1 AND user_id = $2', [groupId, userId])
+        return result.rows[0] || null
     }
 
-
-    async JoinGroup(username) {
-        try {
-            const { pool } = require('./app.js');
-            const cardData = await profile.CardInfo();
-            if (cardData) {
-                const profile = await GetProfile(username)
-                if (profile) {
-                    const query = `
-                    INSERT INTO groupmembers (group_id, user_id, role)
-                    SELECT g.id, u.id, $3
-                    FROM groups g, users u
-                    WHERE g.group_name = $1
-                    AND u.username = $2
-                    RETURNING group_id, user_id, role;`
-                    result = await pool.query(query, [groupName, username, role]);
-
-                }
-            }
-        } catch (Joinerror) {
-            console.log(Joinerror)
-            throw Joinerror
-
-        }
-
-
+    async AcceptedMembers(groupId, client = this.pool) {
+        const result = await client.query(
+            `SELECT u.id, u.username, gm.role
+             FROM groupmembers gm JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = $1 AND gm.status = 'accepted'
+             ORDER BY u.username`, [groupId])
+        return result.rows
     }
 
-
-
-
-    async AddUsertoGroup(groupName, userList, username, role) {
-        //Add new user to existing Group?? might have to call checkgroups??
-        //user has to be owner add user to group
-
-        try {
-            const { pool } = require('./app.js');
-            console.log(username)
-            const check = await this.isOwner(groupName, username)
-            const addList = {}
-            if (check) {
-                console.log("ABLE TO ENTER CHECK THE OWNER WORKED")
-                let result = 0
-                for (let i = 0; i < userList.length; i++) {
-                    //check if each user is exist first(get profile)
-                    console.log("PRINTING USERS", userList[i])
-                    const person = await profile.GetProfile(userList[i])
-                    if (person) {
-                        const query = `
-                            INSERT INTO groupmembers (group_id, user_id, role)
-                            SELECT g.id, u.id, $3
-                            FROM groups g, users u
-                            WHERE g.group_name = $1
-                            AND u.username = $2
-                            RETURNING group_id, user_id, role;
-                            `
-                        console.log("TRUE PERSONS", person)
-                        result = await pool.query(query, [groupName, userList[i], role]);
-                        console.log("FIXING", result)
-                        if (result.rowCount > 0) {
-                            addList[userList[i].toString()] = "added"
-                            console.log("Is IT WORKING")
-                        }
-
-                    }
-
-                    else {
-                        addList[userList[i].toString()] = "null"
-                    }
-
-                }
-                return addList
-            }
-
-        } catch (createError) {
-            console.log(createError)
-            throw createError
-        }
-
+    // Creates the group with the creator as accepted owner and invites the rest.
+    async CreateGroup(ownerId, groupName, inviteeIds) {
+        return withTransaction(async (client) => {
+            const created = await client.query(
+                'INSERT INTO groups (group_name, created_by_user) VALUES ($1, $2) RETURNING id', [groupName, ownerId])
+            const groupId = created.rows[0].id
+            await client.query(
+                `INSERT INTO groupmembers (group_id, user_id, role, status) VALUES ($1, $2, 'owner', 'accepted')`,
+                [groupId, ownerId])
+            await this.#invite(client, groupId, inviteeIds.filter((id) => id !== ownerId))
+            return groupId
+        })
     }
 
-
-    async DeleteUserFromGroup(username) {
-        //Delete user from group?? check if user is the owner
-        try {
-
-
-
-        } catch (createError) {
-            console.log(createError)
-        }
-
-
-
-
+    async InviteMembers(groupId, inviteeIds) {
+        return this.#invite(this.pool, groupId, inviteeIds)
     }
 
-
-    async DeleteGroup(username, groupName) {
-        //can only delete group if you are owner of the group
-
-
-
-
+    async #invite(client, groupId, userIds) {
+        if (userIds.length === 0) return 0
+        const result = await client.query(
+            `INSERT INTO groupmembers (group_id, user_id, role, status)
+             SELECT $1, unnest($2::int[]), 'member', 'pending'
+             ON CONFLICT ON CONSTRAINT unique_group_user DO NOTHING`, [groupId, userIds])
+        return result.rowCount
     }
 
+    // Accepting flips the invite to accepted; declining removes it.
+    async RespondToInvite(groupId, userId, accept) {
+        const result = accept
+            ? await this.pool.query(
+                `UPDATE groupmembers SET status = 'accepted'
+                 WHERE group_id = $1 AND user_id = $2 AND status = 'pending'`, [groupId, userId])
+            : await this.pool.query(
+                `DELETE FROM groupmembers WHERE group_id = $1 AND user_id = $2 AND status = 'pending'`,
+                [groupId, userId])
+        return result.rowCount > 0
+    }
+
+    async LeaveGroup(groupId, userId) {
+        const result = await this.pool.query(
+            `DELETE FROM groupmembers WHERE group_id = $1 AND user_id = $2 AND role <> 'owner'`, [groupId, userId])
+        return result.rowCount > 0
+    }
+
+    // Can only delete group if you are owner of the group
+    async DeleteGroup(groupId, ownerId) {
+        return withTransaction(async (client) => {
+            const owner = await client.query(
+                `SELECT 1 FROM groupmembers WHERE group_id = $1 AND user_id = $2 AND role = 'owner'`,
+                [groupId, ownerId])
+            if (owner.rowCount === 0) return false
+            await client.query('DELETE FROM groupmembers WHERE group_id = $1', [groupId])
+            await client.query('DELETE FROM groups WHERE id = $1', [groupId])
+            return true
+        })
+    }
 }
 
-const { pool } = require('../app.js');
-const group = Group();
-module.exports = { group };
+const group = new Group(pool)
+module.exports = { group }

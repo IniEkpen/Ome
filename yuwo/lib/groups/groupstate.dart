@@ -1,11 +1,15 @@
 import "package:flutter/material.dart";
+import "../services/api_client.dart";
+import "../services/group_service.dart";
 import "groupmodel.dart";
-import "grouplogic.dart";
 
 // Single source of truth for group data. Create ONE instance of this above
-// both GroupInvite and Joined (see groupdesign.dart) so accepting/declining
-// an invite in one widget instantly updates the other -- no separate fetches.
+// both GroupInvite and Joined so accepting/declining an invite in one widget
+// instantly updates the other -- no separate fetches.
 class GroupsState extends ChangeNotifier {
+  GroupsState(this._service);
+
+  final GroupService _service;
   List<GroupModel> _groups = [];
   bool isLoading = false;
   String? error;
@@ -20,43 +24,19 @@ class GroupsState extends ChangeNotifier {
     isLoading = true;
     error = null;
     notifyListeners();
-
-    final result = await loadGroups();
-
-    isLoading = false;
-    if (result != null) {
-      _groups = result;
-    } else {
-      error = "Couldn't load groups";
+    try {
+      _groups = await _service.listGroups();
+    } on ApiException catch (e) {
+      error = e.message;
     }
+    isLoading = false;
     notifyListeners();
   }
 
-  // Accept (true) or decline (false) a pending invite.
-  Future<void> respond(String groupname, bool accept) async {
-    final result = await groupChoice(accept, groupname: groupname);
-
-    if (result != null) {
-      // Server sent back the authoritative full list -- use it.
-      _groups = result;
-      notifyListeners();
-    } else {
-      // ASSUMPTION: on failure we leave state untouched so the invite
-      // stays visible and the user can retry. Swap `error` for a
-      // SnackBar/toast trigger if you'd rather surface this directly.
-      error = "Couldn't update $groupname";
-      notifyListeners();
-    }
-  }
-
-  Future<void> create(String groupname, List<String> people) async {
-    final result = await createGroup(groupname, people);
-    if (result != null) {
-      _groups = result;
-      notifyListeners();
-    } else {
-      error = "Couldn't create $groupname";
-      notifyListeners();
-    }
+  // Accept (true) or decline (false) a pending invite. Rethrows so the UI can
+  // send the user to add a card when the server answers `card_required`.
+  Future<void> respond(GroupModel group, bool accept) async {
+    await _service.respondToInvite(group.id, accept: accept);
+    await loadAll();
   }
 }

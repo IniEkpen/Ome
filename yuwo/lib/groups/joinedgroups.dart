@@ -1,5 +1,6 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
+import "../pages/group_detail.dart";
 import "../theme/app_theme.dart";
 import "groupstate.dart";
 
@@ -51,57 +52,69 @@ class Joined extends StatelessWidget {
             top: index * _offset,
             left: 0,
             right: 0,
-            child: Container(
-              height: _cardHeight,
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: colors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            child: GestureDetector(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GroupDetailPage(group: group),
+                  ),
+                );
+                if (context.mounted) context.read<GroupsState>().loadAll();
+              },
+              child: Container(
+                height: _cardHeight,
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: colors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  boxShadow: index == 0
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
+                          ),
+                        ],
                 ),
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                boxShadow: index == 0
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 16,
-                          offset: const Offset(0, -4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        group.groupname,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.pageTitle.copyWith(
+                          color: AppColors.surface,
+                          fontSize: 20,
                         ),
-                      ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      group.groupname,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.pageTitle.copyWith(
-                        color: AppColors.surface,
-                        fontSize: 20,
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(AppRadius.control),
-                    ),
-                    child: Text(
-                      "${group.people.length} "
-                      "${group.people.length == 1 ? "member" : "members"}",
-                      style: AppText.sectionTitle.copyWith(
-                        color: AppColors.surface,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(AppRadius.control),
+                      ),
+                      child: Text(
+                        group.hasOpenSplit
+                            ? "Bill open"
+                            : "${group.people.length} "
+                                  "${group.people.length == 1 ? "member" : "members"}",
+                        style: AppText.sectionTitle.copyWith(
+                          color: AppColors.surface,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );

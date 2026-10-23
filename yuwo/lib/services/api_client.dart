@@ -26,24 +26,51 @@ abstract final class ApiConfig {
 }
 
 /// A user-facing error. [message] is safe to show in the UI; it never
-/// contains raw server output.
+/// contains raw server output. [code] lets callers react to specific
+/// failures, e.g. 'card_required'.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(this.message, {this.statusCode, this.code});
 
   final String message;
   final int? statusCode;
+  final String? code;
+
+  bool get isCardRequired => code == 'card_required';
 
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => 'ApiException($statusCode, $code): $message';
 }
 
 class ApiResponse {
-  const ApiResponse(this.statusCode, this.json);
+  const ApiResponse(this.statusCode, this.body);
 
   final int statusCode;
-  final Map<String, dynamic>? json;
+
+  /// Decoded JSON: a Map, a List, or null.
+  final Object? body;
+
+  Map<String, dynamic>? get json =>
+      body is Map<String, dynamic> ? body as Map<String, dynamic> : null;
 
   bool get isSuccess => statusCode >= 200 && statusCode < 300;
+
+  /// The backend only attaches a `code` to errors whose message was written
+  /// for users, so those are shown as-is; anything else gets [fallback].
+  ApiException error(String fallback) {
+    final code = json?['code'];
+    final message = json?['error'];
+    return ApiException(
+      code is String && message is String ? message : fallback,
+      statusCode: statusCode,
+      code: code is String ? code : null,
+    );
+  }
+
+  /// Throws [error] unless the request succeeded.
+  ApiResponse orThrow(String fallback) {
+    if (!isSuccess) throw error(fallback);
+    return this;
+  }
 }
 
 /// Single place for HTTP so every request gets the same headers, timeout,
@@ -55,22 +82,40 @@ class ApiClient {
   final http.Client _http;
   final String? Function()? tokenProvider;
 
-  Future<ApiResponse> post(String path, {Map<String, Object?>? body}) async {
+  Map<String, String> _headers({String accept = 'application/json'}) {
     final headers = {
       'Content-Type': 'application/json; charset=UTF-8',
-      'Accept': 'application/json',
+      'Accept': accept,
     };
     final token = tokenProvider?.call();
     if (token != null) headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
+
+  Future<ApiResponse> get(String path) => _send('GET', path);
+
+  Future<ApiResponse> post(String path, {Map<String, Object?>? body}) =>
+      _send('POST', path, body: body);
+
+  Future<ApiResponse> put(String path, {Map<String, Object?>? body}) =>
+      _send('PUT', path, body: body);
+
+  Future<ApiResponse> delete(String path) => _send('DELETE', path);
+
+  Future<ApiResponse> _send(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final request = http.Request(method, ApiConfig.uri(path))
+      ..headers.addAll(_headers());
+    if (method != 'GET') request.body = jsonEncode(body ?? const {});
 
     try {
-      final response = await _http
-          .post(
-            ApiConfig.uri(path),
-            headers: headers,
-            body: jsonEncode(body ?? const {}),
-          )
-          .timeout(ApiConfig.timeout);
+      final streamed = await _http.send(request).timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(
+        streamed,
+      ).timeout(ApiConfig.timeout);
       return ApiResponse(response.statusCode, _decode(response.body));
     } on TimeoutException {
       throw const ApiException('The server took too long to respond.');
@@ -81,11 +126,48 @@ class ApiClient {
     }
   }
 
-  static Map<String, dynamic>? _decode(String body) {
+  /// Server-Sent Events: yields each `data:` payload as JSON for as long as
+  /// the connection stays open. Callers reconnect when the stream ends.
+  Stream<Map<String, dynamic>> events(String path) async* {
+    final request = http.Request('GET', ApiConfig.uri(path))
+      ..headers.addAll(_headers(accept: 'text/event-stream'));
+    final http.StreamedResponse response;
+    try {
+      response = await _http.send(request).timeout(ApiConfig.timeout);
+    } on TimeoutException {
+      throw const ApiException('The server took too long to respond.');
+    } on http.ClientException {
+      throw const ApiException('Lost connection to the server.');
+    }
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      throw ApiResponse(
+        response.statusCode,
+        _decode(body),
+      ).error('Could not connect to live updates.');
+    }
+
+    final data = StringBuffer();
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+    await for (final line in lines) {
+      if (line.isEmpty) {
+        // A blank line ends one event.
+        final decoded = _decode(data.toString());
+        data.clear();
+        if (decoded is Map<String, dynamic>) yield decoded;
+      } else if (line.startsWith('data:')) {
+        data.write(line.substring(5).trimLeft());
+      }
+      // Lines starting with ':' are heartbeats and are ignored.
+    }
+  }
+
+  static Object? _decode(String body) {
     if (body.isEmpty) return null;
     try {
-      final decoded = jsonDecode(body);
-      return decoded is Map<String, dynamic> ? decoded : null;
+      return jsonDecode(body);
     } on FormatException {
       return null;
     }

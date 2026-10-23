@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
 import "../theme/app_theme.dart";
+import "../widgets/card_gate.dart";
 import "groupstate.dart";
 import "groupmodel.dart";
 
@@ -100,8 +101,10 @@ class _InviteCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () =>
-                      context.read<GroupsState>().respond(group.groupname, false),
+                  onPressed: () => runWithCard(
+                    context,
+                    () => context.read<GroupsState>().respond(group, false),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.surface,
                     side: const BorderSide(color: AppColors.hint),
@@ -113,8 +116,11 @@ class _InviteCard extends StatelessWidget {
               ),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () =>
-                      context.read<GroupsState>().respond(group.groupname, true),
+                  // Joining needs a valid card; runWithCard asks for one if missing.
+                  onPressed: () => runWithCard(
+                    context,
+                    () => context.read<GroupsState>().respond(group, true),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.surface,
                     foregroundColor: AppColors.textPrimary,

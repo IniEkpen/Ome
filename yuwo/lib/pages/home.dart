@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/money.dart';
 import '../widgets/common.dart';
+import 'home_data.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.data});
 
-  // Placeholder until balances come from the backend.
-  static const _amountOwed = 200;
+  /// Defaults to mock entries until balances come from the backend.
+  final HomeData? data;
 
   @override
   Widget build(BuildContext context) {
+    final home = data ?? HomeData.mock();
+    final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
     return Scaffold(
       appBar: YuwoAppBar(
         actions: [
@@ -25,27 +29,44 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppCard(
-              height: 200,
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SectionHeader(
-                    'You Owe',
-                    subtitle: 'Collective Amount Owed From Splits',
-                  ),
-                  const SizedBox(height: AppSpacing.gap),
-                  Text('\$$_amountOwed', style: AppText.amount),
-                ],
-              ),
-            ),
+            if (home.isMock) ...[
+              const _SampleDataBadge(),
+              const SizedBox(height: AppSpacing.field),
+            ],
+            _BalanceCard(home: home, openBills: open.length),
             const SizedBox(height: AppSpacing.section),
-            const SectionHeader('Splits to Complete'),
-            const SplitList(),
-            const SizedBox(height: AppSpacing.gap),
-            const SectionHeader('Transactions'),
-            const SplitList(),
+            const SectionHeader(
+              'Open Bills',
+              subtitle: 'Bills in your groups that still need something',
+            ),
+            const SizedBox(height: AppSpacing.field),
+            if (open.isEmpty)
+              AppCard(
+                width: double.infinity,
+                child: Text(
+                  "You're all settled up",
+                  style: AppText.body.copyWith(color: AppColors.hint),
+                ),
+              )
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                child: Row(
+                  spacing: AppSpacing.field,
+                  children: [
+                    for (var i = 0; i < open.length; i++)
+                      _BillCard(bill: open[i], colorIndex: i),
+                  ],
+                ),
+              ),
+            const SizedBox(height: AppSpacing.section),
+            const SectionHeader(
+              'Recent Activity',
+              subtitle: 'Payments and changes across your groups',
+            ),
+            const SizedBox(height: AppSpacing.field),
+            _ActivityList(activity: home.activity),
           ],
         ),
       ),
@@ -53,35 +74,287 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class SplitList extends StatelessWidget {
-  const SplitList({super.key});
+class _SampleDataBadge extends StatelessWidget {
+  const _SampleDataBadge();
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
-      child: Row(
-        spacing: 12.0,
-        children: List.generate(10, (i) => const SplitItem()),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Text(
+        'Sample data',
+        style: AppText.caption.copyWith(color: AppColors.hint),
       ),
     );
   }
 }
 
-class SplitItem extends StatelessWidget {
-  const SplitItem({super.key});
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.home, required this.openBills});
+
+  final HomeData home;
+  final int openBills;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: AppCard(
-        height: 112,
-        width: 224,
-        radius: AppRadius.tile,
-        child: SizedBox.shrink(),
+    return AppCard(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            'You Owe',
+            subtitle: 'Your share of bills that are still open',
+          ),
+          const SizedBox(height: AppSpacing.field),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(Money.format(home.youOweCents), style: AppText.amount),
+          ),
+          const Divider(height: 32, color: AppColors.divider),
+          Row(
+            children: [
+              Expanded(
+                child: _Stat(
+                  label: 'Owed to you',
+                  value: Money.format(home.owedToYouCents),
+                ),
+              ),
+              Expanded(
+                child: _Stat(label: 'Open bills', value: '$openBills'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppText.caption.copyWith(color: AppColors.hint)),
+        Text(value, style: AppText.pageTitle.copyWith(fontSize: 20)),
+      ],
+    );
+  }
+}
+
+/// Same gradients as the joined-group cards so a bill matches its group's look.
+class _BillCard extends StatelessWidget {
+  const _BillCard({required this.bill, required this.colorIndex});
+
+  final HomeBill bill;
+  final int colorIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        AppColors.groupCards[colorIndex % AppColors.groupCards.length];
+    final onCard = AppColors.surface;
+    return Container(
+      width: 240,
+      height: 150,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  bill.groupName,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(
+                    color: onCard.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                child: Text(
+                  bill.stage.label,
+                  style: AppText.caption.copyWith(color: onCard),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            bill.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.pageTitle.copyWith(color: onCard, fontSize: 20),
+          ),
+          const Spacer(),
+          Text(
+            bill.isHost ? "You're hosting · collecting" : 'Your share',
+            style: AppText.caption.copyWith(
+              color: onCard.withValues(alpha: 0.8),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  Money.format(bill.amountCents),
+                  style: AppText.pageTitle.copyWith(
+                    color: onCard,
+                    fontSize: 22,
+                  ),
+                ),
+              ),
+              Icon(Icons.group, size: 14, color: onCard),
+              const SizedBox(width: 4),
+              Text(
+                '${bill.people}',
+                style: AppText.sectionTitle.copyWith(color: onCard),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityList extends StatelessWidget {
+  const _ActivityList({required this.activity});
+
+  final List<HomeActivity> activity;
+
+  @override
+  Widget build(BuildContext context) {
+    if (activity.isEmpty) {
+      return AppCard(
+        width: double.infinity,
+        child: Text(
+          'Nothing yet. Join a group to get started.',
+          style: AppText.body.copyWith(color: AppColors.hint),
+        ),
+      );
+    }
+    return AppCard(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        children: [
+          for (var i = 0; i < activity.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.divider),
+            _ActivityRow(entry: activity[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.entry});
+
+  final HomeActivity entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final (
+      IconData icon,
+      String text,
+      String? amount,
+      Color color,
+    ) = switch (entry.kind) {
+      ActivityKind.youPaid => (
+        Icons.arrow_upward,
+        'You paid ${entry.who}',
+        '-${Money.format(entry.amountCents)}',
+        AppColors.textPrimary,
+      ),
+      ActivityKind.paidYou => (
+        Icons.arrow_downward,
+        '${entry.who} paid you',
+        '+${Money.format(entry.amountCents)}',
+        AppColors.contact,
+      ),
+      ActivityKind.waived => (
+        Icons.volunteer_activism_outlined,
+        '${entry.who} waived part of your share',
+        Money.format(entry.amountCents),
+        AppColors.hint,
+      ),
+      ActivityKind.joined => (
+        Icons.person_add_alt,
+        '${entry.who} joined',
+        null,
+        AppColors.hint,
+      ),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.background,
+            foregroundColor: AppColors.textPrimary,
+            child: Icon(icon, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.field),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: AppText.body),
+                Text(
+                  '${entry.groupName} · ${_relative(entry.when)}',
+                  style: AppText.caption.copyWith(color: AppColors.hint),
+                ),
+              ],
+            ),
+          ),
+          if (amount != null)
+            Text(
+              amount,
+              style: AppText.body.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _relative(DateTime when) {
+    final diff = DateTime.now().difference(when);
+    if (diff.inHours < 1) return 'Just now';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
   }
 }

@@ -1,80 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe_connect/flutter_stripe_connect.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'main.dart';
 
+import 'services/api_client.dart';
+import 'services/auth_service.dart';
+import 'services/payment_service.dart';
 
-///will add payment soon to call in other functions needs to connect to 
-
-class Pay extends StatefulWidget{
+/// Stripe Connect onboarding for hosts, so the money members pay a host can
+/// be paid out to them. The client secret comes from our server; only the
+/// publishable key lives in the app.
+class Pay extends StatefulWidget {
   const Pay({super.key});
   @override
-  State<Pay> createState()=> _Payment();
+  State<Pay> createState() => _Payment();
 }
-
 
 class _Payment extends State<Pay> {
   bool _isStripeReady = false;
+  String? _error;
 
   @override
-  //make this is loaded in before it shows
-  void initState(){
-    super.initState();{
-      setupStripe(context);
-    }
+  void initState() {
+    super.initState();
+    setupStripe();
+  }
 
-  }
-Future<void> setupStripe(BuildContext context) async{
-  const url = 'https://ome-o9wx.onrender.com/create/stripe';
-  String userId = "12345";
-  final uri = Uri.parse('$url/$userId');
-  try{
-    final stripeConnect = await StripeConnect.instance.initialize(
-      publishableKey:'',
-      clientSecretProvider: () async{
-      final http.Response postResponse= await http.post(uri,
-      headers: {'Content-Type':'application/json; charset = UTF-8'},
-      body: jsonEncode({'username': 'john', 'email': 'john@gmail.com'}));
-      final data = jsonDecode(postResponse.body);
-      final clientSecret = data['client_secret'];
-      return clientSecret;
-      }
-    );
-   if (context.mounted) { 
-    // Checks if the screen is still active before updating UI
-      setState(() {
-        _isStripeReady = true;
-      });
-   }
-  }
-    catch(error){
-      debugPrint('');
+  Future<void> setupStripe() async {
+    if (!StripeConfig.isConfigured) {
+      setState(() => _error = "Payouts aren't available in this build yet.");
+      return;
+    }
+    final payments = PaymentService(AuthScope.read(context));
+    try {
+      await StripeConnect.instance.initialize(
+        publishableKey: StripeConfig.publishableKey,
+        clientSecretProvider: payments.connectOnboardingSecret,
+      );
+      // Checks if the screen is still active before updating UI
+      if (mounted) setState(() => _isStripeReady = true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = "Couldn't start payout setup.");
     }
   }
 
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Payment Window')
-      ),
-      body:StripeAccountOnboarding(
-        onLoaded: ()=> ('Onboarding loaded'),
-        onLoadError:(error)=>('Error')
-      )
+      appBar: AppBar(title: const Text('Payouts')),
+      body: _error != null
+          ? Center(child: Text(_error!))
+          : !_isStripeReady
+          ? const Center(child: CircularProgressIndicator())
+          : StripeAccountOnboarding(
+              onLoaded: () => debugPrint('Onboarding loaded'),
+              onLoadError: (error) =>
+                  setState(() => _error = "Couldn't load payout setup."),
+            ),
     );
-
-
-
-
   }
-   
- 
-
-
 }
-
-
-
-

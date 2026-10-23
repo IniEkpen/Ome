@@ -1,3 +1,4 @@
+import '../groups/groupmodel.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
 
@@ -6,49 +7,43 @@ class GroupService {
 
   final AuthService _auth;
 
-  // The acting user always comes from the session, never from user input.
-  String get _username {
-    final session = _auth.session;
-    if (session == null) {
-      throw const ApiException('Please sign in again.', statusCode: 401);
-    }
-    return session.username;
+  // The acting user always comes from the session token, never from user input.
+
+  Future<List<GroupModel>> listGroups() async {
+    final response = (await _auth.client.get(
+      '/groups',
+    )).orThrow("Couldn't load groups");
+    final rows = response.body is List ? response.body as List : const [];
+    return rows
+        .map((g) => GroupModel.fromJson(g as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<void> createGroup({
+  /// Throws an [ApiException] with `isCardRequired` when there's no valid card.
+  /// Returns the usernames that couldn't be found.
+  Future<List<String>> createGroup({
     required String groupName,
     required List<String> members,
   }) async {
-    final response = await _auth.client.post(
-      '/users/groups/create',
-      body: {
-        'username': _username,
-        'groupName': groupName,
-        'userList': members,
-      },
-    );
-    if (!response.isSuccess) {
-      throw ApiException(
-        "We couldn't create that group. Please try again.",
-        statusCode: response.statusCode,
-      );
-    }
-    if (response.json?['Group Created'] != true) {
-      throw const ApiException('Add a payment method before creating a group.');
-    }
+    final response = (await _auth.client.post(
+      '/groups',
+      body: {'groupName': groupName, 'members': members},
+    )).orThrow("We couldn't create that group. Please try again.");
+    return List<String>.from(response.json?['notFound'] ?? const []);
+  }
+
+  /// Accepting needs a valid card (`isCardRequired` otherwise).
+  Future<void> respondToInvite(int groupId, {required bool accept}) async {
+    (await _auth.client.post(
+      '/groups/$groupId/invites/respond',
+      body: {'accept': accept},
+    )).orThrow("Couldn't update that invite.");
   }
 
   /// Only call after the user has confirmed in the UI.
-  Future<void> deleteGroup(String groupName) async {
-    final response = await _auth.client.post(
-      '/users/groups/delete',
-      body: {'username': _username, 'groupName': groupName, 'choice': 'yes'},
-    );
-    if (!response.isSuccess) {
-      throw ApiException(
-        "We couldn't delete that group.",
-        statusCode: response.statusCode,
-      );
-    }
+  Future<void> deleteGroup(int groupId) async {
+    (await _auth.client.delete(
+      '/groups/$groupId',
+    )).orThrow("We couldn't delete that group.");
   }
 }

@@ -1,184 +1,46 @@
-const userService = require('../services/userService')
 const router = require('express').Router()
+const { profile, Profile } = require('../models/Profile')
+const { HttpError, hashPassword, verifyPassword, issueToken, requireUser } = require('../auth')
 
-// User login
-router.get('/login', async (req, res, next) => {
-    try {
-        console.log(req.body)
-        const { username } = req.body;
-        console.log(username)
-        const userExists = await userService.checkUser(username)
-        return res.status(200).json(userExists);
-    } catch (error) {
-        return next(error);
-    }
-});
+const USERNAME = /^[A-Za-z0-9_.]{3,30}$/
 
 // User signup
-router.post('/signup', async (req, res, next) => {
-    console.log("HIT");
-    try {
-        const userId = req.params.id;
-        console.log(req.body)
-        const { username, email, phone, password, stripe_customer_id } = req.body;
-        const card_info = 'no'
-        const recorded = await profile.CreateProfile(username, email, phone, password, stripe_customer_id, card_info)
-        if (recorded) {
-            return res.status(204).send()
-        }
-    } catch (error) {
-        return res.status(500).json({ error: error.message })
+router.post('/signup', async (req, res) => {
+    const { username, email, phone, password } = req.body || {}
+    if (typeof username !== 'string' || !USERNAME.test(username)) {
+        throw new HttpError(400, 'Choose a username of 3-30 letters, numbers, _ or .', 'invalid_username')
     }
-});
-
-// Create 
-router.post('/groups/create', async (req, res) => {
-    try {
-        const { username, groupName, userList } = req.body
-        const groupie = await group.CreateGroup(groupName, username)
-        if (groupie) {
-            console.log("CHECK1")
-            //WORKS UP TO HERE NOW
-            if (userList.length > 0) {
-                console.log("CHECK2")
-                const role = 'member'
-                try {
-                    const check = await group.AddUsertoGroup(groupName, userList, username, role)
-                    return res.status(200).json({ 'Group Created': true, 'Users Added': check })
-                } catch (userError) {
-                    return res.status(500).json({ error: error.message, 'ERO': 'error' })
-                }
-
-            }
-            //if there are users but they werent added//
-            else {
-                console.log("should reached this")
-                return res.status(200).json({ 'Group Created': true, 'Users Added': 'None' })
-            }
-
-        }
-        else {
-            //if group didnt have card info payment filled
-            return res.status(200).json({ 'Group Created': false })
-        }
-    } catch (error) {
-        return res.status(500).json({ error: error.message, 'ERO': 'error' })
+    if (typeof password !== 'string' || password.length < 8) {
+        throw new HttpError(400, 'Use a password of at least 8 characters.', 'invalid_password')
     }
-
-
-});
-
-router.get('/users/groups/join', async (req, res) => {
-    await JoinGroup();
-});
-
-
-router.get('/groups/addUser', async (req, res) => {
-    try {
-        const userId = req.params.id;
-        const { username, groupName, userList } = req.body
-        const add = await group.AddUserGroup()
-        return res.status(200).json({ 'Users Added': add })
-    } catch (addError) {
-        console.log(addError)
-        return res.status(500).json({ error: error.message, 'ERO': 'error' })
-
+    if (await profile.UsernameOrEmailTaken(username, email || null)) {
+        throw new HttpError(409, 'That username or email is already in use.', 'taken')
     }
-
-});
-
-
-router.post('/groups/delete', async (req, res) => {
-    const userId = req.params.id;
-    const { username, groupName, choice } = req.body;
-    if (choice == 'no')
-        return res.json({ message: "return" })
-    else {
-        const check = await DeleteGroup(username, groupName)
-        if (check) {
-            return res.status(200).json({ message: "Deleted" })
-
-        }
-        else {
-            return res.status(500).json({ message: "Unable to delete" })
-        }
-    }
-});
-
-
-/*
-app.post('/get/stripe', async (req, res) => {
-    try {
-        const userId = req.params.id
-        const { username, email } = req.body
-        const accountSession = await stripe.accountSessions.create({
-            account: '{{CONNECTED_ACCOUNT_ID}}',
-            components: {
-                account_onboarding: {
-                    enabled: true,
-                },
-            },
-        });
-        res.json({ client_secret: accountSession.client_secret })
-
-    } catch (stripeError) {
-        console.error()
-
-    }
-
-
-
+    const user = await profile.CreateProfile(username, email || null, phone || null, hashPassword(password))
+    // New accounts have no card yet; the app sends them to add one before joining groups.
+    return res.status(201).json({ token: issueToken(user), username: user.username, card: Profile.CardSummary(null) })
 })
 
-app.post('/create/stripe', async (req, res) => {
-    try {
-        const userId = req.params.id
-        const { username, email } = req.body
-        const stripe_customer_id = await stripe.v2.core.accounts.create({
-            contact_email: email,
-            display_name: username,
-            identity: {
-                country: 'us',
-                entity_type: 'individual',
-
-            },
-            configuration: {
-                customer: {
-                    capabilities: {
-                        automatic_indirect_tax: {
-                            requested: true,
-                        },
-                    },
-                },
-
-                recipient: {
-                    capabilities: {
-                        bank_accounts: {
-                            local: {
-                                requested: true,
-                            },
-                        },
-                    },
-                },
-                dashboard: 'express',
-                include: ['identity', 'configuration.recipient', 'requirements', 'configuration.customer', 'defaults'],
-            },
-
-
-        }
-
-        )
-        const stripe = await profile.AddStripe(username, stripe_customer_id)
-
-
-    } catch (stripeError) {
-
-    }
-
-
-
+// User login
+router.post('/login', async (req, res) => {
+    const { username, password } = req.body || {}
+    const user = typeof username === 'string' ? await profile.GetProfileWithPassword(username) : null
+    const check = verifyPassword(password, user?.password)
+    // Same answer for unknown user and wrong password.
+    if (!user || !check.ok) throw new HttpError(401, 'Incorrect username or password.', 'invalid_credentials')
+    if (check.needsRehash) await profile.UpdatePasswordHash(user.id, hashPassword(password))
+    return res.json({
+        token: issueToken(user),
+        username: user.username,
+        UserExists: true,
+        card: Profile.CardSummary(user),
+    })
 })
 
-*/
+router.get('/me', requireUser, async (req, res) => {
+    const user = await profile.GetProfileById(req.user.id)
+    if (!user) throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
+    return res.json({ id: user.id, username: user.username, email: user.email, card: Profile.CardSummary(user) })
+})
 
-module.exports = router;
+module.exports = router

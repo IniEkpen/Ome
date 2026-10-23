@@ -1,0 +1,47 @@
+const router = require('express').Router()
+const { requireUser, HttpError } = require('../auth')
+const splits = require('../services/splitService')
+
+router.use(requireUser)
+
+function idParam(req, name) {
+    const id = Number(req.params[name])
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id.', 'invalid_id')
+    return id
+}
+
+router.get('/:splitId', async (req, res) => {
+    return res.json({ split: await splits.getSplit(req.user, idParam(req, 'splitId')) })
+})
+
+// Anyone in the bill: tap the receipt icon to say "I had this".
+router.put('/:splitId/items/:itemId/claim', async (req, res) => {
+    const split = await splits.setClaim(
+        req.user, idParam(req, 'splitId'), idParam(req, 'itemId'), req.body?.claimed === true)
+    return res.json({ split })
+})
+
+// Host only from here down.
+router.put('/:splitId/mode', async (req, res) => {
+    return res.json({ split: await splits.setMode(req.user, idParam(req, 'splitId'), req.body?.mode) })
+})
+
+router.put('/:splitId/participants/:userId/waiver', async (req, res) => {
+    const split = await splits.setWaiver(
+        req.user, idParam(req, 'splitId'), idParam(req, 'userId'), req.body?.waivedCents)
+    return res.json({ split })
+})
+
+router.post('/:splitId/confirm', async (req, res) => {
+    return res.json(await splits.confirmSplit(req.user, idParam(req, 'splitId')))
+})
+
+router.post('/:splitId/cancel', async (req, res) => {
+    return res.json({ split: await splits.cancelSplit(req.user, idParam(req, 'splitId')) })
+})
+
+router.post('/:splitId/retry-charges', async (req, res) => {
+    return res.json(await splits.retryCharges(req.user, idParam(req, 'splitId')))
+})
+
+module.exports = router

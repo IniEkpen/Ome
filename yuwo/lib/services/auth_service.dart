@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'api_client.dart';
@@ -16,9 +17,19 @@ class Session {
 ///
 /// The session is held in memory only, so credentials never touch disk.
 class AuthService extends ChangeNotifier {
-  AuthService({ApiClient? client}) {
+  AuthService({ApiClient? client, this.devLogin = devLoginDefault}) {
     _client = client ?? ApiClient(tokenProvider: () => _session?.token);
   }
+
+  /// Development only: any username/password signs in. Still tries the
+  /// server first so you get a real token when it accepts you; otherwise you
+  /// get a local session with no token (server calls will answer 401).
+  /// On in debug builds; turn off with --dart-define=DEV_LOGIN=false.
+  /// Always off in release builds because kDebugMode is const false there.
+  static const devLoginDefault =
+      kDebugMode && bool.fromEnvironment('DEV_LOGIN', defaultValue: true);
+
+  final bool devLogin;
 
   late final ApiClient _client;
   Session? _session;
@@ -34,6 +45,22 @@ class AuthService extends ChangeNotifier {
   );
 
   Future<void> login({
+    required String username,
+    required String password,
+  }) async {
+    if (devLogin) {
+      try {
+        await _serverLogin(username: username, password: password);
+      } on ApiException {
+        _session = Session(username: username);
+        notifyListeners();
+      }
+      return;
+    }
+    await _serverLogin(username: username, password: password);
+  }
+
+  Future<void> _serverLogin({
     required String username,
     required String password,
   }) async {
@@ -70,12 +97,9 @@ class AuthService extends ChangeNotifier {
         'password': password,
       },
     );
-    if (!response.isSuccess) {
-      throw ApiException(
-        "We couldn't create your account. Try a different username or email.",
-        statusCode: response.statusCode,
-      );
-    }
+    response.orThrow(
+      "We couldn't create your account. Try a different username or email.",
+    );
     await login(username: username, password: password);
   }
 

@@ -1,5 +1,7 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
+import "../services/auth_service.dart";
+import "../services/group_service.dart";
 import "../theme/app_theme.dart";
 import "../widgets/common.dart";
 import "groupstate.dart";
@@ -65,7 +67,8 @@ class _Grouping extends State<Group> {
     // GroupsState created once here, above both GroupInvite and Joined,
     // so they share one list and one fetch instead of each fetching separately.
     return ChangeNotifierProvider(
-      create: (_) => GroupsState()..loadAll(),
+      create: (_) =>
+          GroupsState(GroupService(AuthScope.read(context)))..loadAll(),
       child: Scaffold(
         body: SafeArea(
           child: SingleChildScrollView(

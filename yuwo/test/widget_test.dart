@@ -16,6 +16,8 @@ AuthService _authWith(MockClientHandler handler) {
       httpClient: MockClient(handler),
       tokenProvider: () => auth.session?.token,
     ),
+    // These tests check real login behaviour, not the dev bypass.
+    devLogin: false,
   );
   return auth;
 }
@@ -67,6 +69,20 @@ void main() {
     expect(find.text('You Owe'), findsNothing);
   });
 
+  testWidgets('dev login lets any username and password in', (tester) async {
+    final auth = AuthService(
+      client: ApiClient(
+        httpClient: MockClient((_) async => http.Response('', 401)),
+      ),
+      devLogin: true,
+    );
+    await tester.pumpWidget(YuwoApp(auth: auth));
+    await _login(tester);
+
+    expect(auth.session?.username, 'george');
+    expect(find.text('You Owe'), findsOneWidget);
+  });
+
   testWidgets('login sends password, shows home, logout returns', (
     tester,
   ) async {
@@ -74,6 +90,14 @@ void main() {
     await tester.pumpWidget(
       YuwoApp(
         auth: _authWith((request) async {
+          // The signed-in tabs also load groups and card status; answer
+          // those with empty data and only record the login request.
+          if (request.url.path != '/users/login') {
+            return http.Response(
+              request.url.path == '/groups' ? '[]' : '{}',
+              200,
+            );
+          }
           sent = jsonDecode(request.body) as Map<String, dynamic>;
           return http.Response(jsonEncode({'token': 'abc'}), 200);
         }),
@@ -86,6 +110,7 @@ void main() {
 
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Log Out'));
     await tester.tap(find.text('Log Out'));
     await tester.pumpAndSettle();
 

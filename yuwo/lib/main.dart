@@ -3,23 +3,33 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'payment.dart';
 import 'networkmap.dart';
-import 'groups/grouplogic.dart';
 import 'groups/groupdesign.dart';
 import 'preview_network.dart';
 import 'routes.dart';
 import 'services/auth_service.dart';
+import 'services/payment_service.dart';
 import 'theme/app_theme.dart';
 
-void main() {
-  // TODO: swap in the signed-in user's id and a real NetworkRepository
-  // backed by the API; FakeNetworkRepository serves sample data until then.
-  runApp(MaterialApp(
-    theme: AppTheme.light,
-    home:Network(
-    viewerId: 'me',
-  repository: FakeNetworkRepository(),
-)
-  ));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // No-op unless built with --dart-define=STRIPE_PUBLISHABLE_KEY=pk_...
+  await StripeConfig.init();
+
+  // The full app (sign-in, groups, bill splitting) is the default. To open
+  // the network map preview on its own instead:
+  //   flutter run --dart-define=PREVIEW=network
+  if (const String.fromEnvironment('PREVIEW') == 'network') {
+    // TODO: swap in the signed-in user's id and a real NetworkRepository
+    // backed by the API; FakeNetworkRepository serves sample data until then.
+    runApp(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Network(viewerId: 'me', repository: FakeNetworkRepository()),
+      ),
+    );
+    return;
+  }
+  runApp(YuwoApp(auth: AuthService()));
   /*Pay();*/
   /*createAccount();*/
 }
@@ -56,8 +66,8 @@ class MyApp extends StatelessWidget {
           PointerDeviceKind.touch,
           PointerDeviceKind.mouse,
           PointerDeviceKind.trackpad,
-        }
-      )
+        },
+      ),
     );
   }
 }
@@ -111,10 +121,8 @@ class _MyHomePageState extends State<MyHomePage> {
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
         actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {})
-        ]
+          IconButton(icon: const Icon(Icons.notifications), onPressed: () {}),
+        ],
       ),
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
@@ -141,17 +149,34 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               Align(
                 alignment: Alignment.center,
-                child: Text('Network Map',
-              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold))),
+                child: Text(
+                  'Network Map',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
               SizedBox(height: 200.0),
               Text(
                 'Splits to Complete',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold )),
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SplitList(),
               SizedBox(height: 20.0),
               Text(
                 'Finished Orders',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: Colors.black,  fontWeight: FontWeight.bold)),
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SplitList(),
             ],
           ),
@@ -159,11 +184,13 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
 
       backgroundColor: Color.fromARGB(255, 240, 240, 240),
-      bottomNavigationBar: NavigationBar(destinations: const <Widget>[
-        NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.explore), label:'Explore',)
-      ],),
-    ); 
+      bottomNavigationBar: NavigationBar(
+        destinations: const <Widget>[
+          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.explore), label: 'Explore'),
+        ],
+      ),
+    );
   }
 }
 
@@ -174,27 +201,25 @@ class SplitList extends StatefulWidget {
   State<SplitList> createState() => _SplitList();
 }
 
-
 class _SplitList extends State<SplitList> {
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: SingleChildScrollView( 
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        spacing: 12.0,
-        children: List.generate(10, (i) => const SplitItem()),
-      )
-      )
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          spacing: 12.0,
+          children: List.generate(10, (i) => const SplitItem()),
+        ),
+      ),
     );
   }
 }
 
-
 class SplitItem extends StatelessWidget {
   const SplitItem({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -205,7 +230,7 @@ class SplitItem extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: const Color.fromARGB(255, 255, 255, 255),
-          borderRadius: BorderRadius.circular(8.0)
+          borderRadius: BorderRadius.circular(8.0),
         ),
       ),
     );

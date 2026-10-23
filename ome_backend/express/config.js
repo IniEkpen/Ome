@@ -1,27 +1,25 @@
 require('dotenv').config()
 
-const port = 3000
-app.listen(process.env.PORT || 3000, () => {
-    console.log('The server is running')
-});
+// Every secret comes from the environment (.env locally, the host's dashboard
+// in production). Nothing sensitive is ever hardcoded or sent to the client.
+const config = {
+    port: Number(process.env.PORT) || 3000,
+    databaseUrl: process.env.DATABASE_URL,
 
-const Pool = require('pg-pool')
-const express = require('express')
-const Stripe = require('stripe')
-const stripe = new Stripe(process.env.STRIPE_KEY)
-console.log("Database URL Exists:", !!process.env.DATABASE_URL);
+    // Signs login tokens. Must be a long random string in production.
+    authTokenSecret: process.env.AUTH_TOKEN_SECRET,
+    authTokenTtlSeconds: 60 * 60 * 24 * 7,
 
-// Connecting to database
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    port: process.env.PORT,
-    ssl: {
-        require: true,
-        rejectUnauthorized: false
+    stripe: {
+        // sk_test_... / sk_live_... (server only, never shipped to the app)
+        secretKey: process.env.STRIPE_SECRET_KEY,
+        // whsec_... from the Stripe dashboard / `stripe listen`
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+        currency: process.env.STRIPE_CURRENCY || 'usd',
     },
-    max: 20,
-    idleTimeoutMillis: 1000, // close idle clients(nothing being sent through)
-    connectionTimeoutMillis: 5000, //after 1 sec connection unable send error
-    maxUses: 7500, //close connection, replace connection
-})
-module.exports = { pool };
+
+    // Comma separated list of origins allowed to call the API from a browser.
+    corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+}
+
+module.exports = config
