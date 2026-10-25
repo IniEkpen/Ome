@@ -19,8 +19,9 @@ Future<void> main() async {
   // the network map preview on its own instead:
   //   flutter run --dart-define=PREVIEW=network
   if (const String.fromEnvironment('PREVIEW') == 'network') {
-    // TODO: swap in the signed-in user's id and a real NetworkRepository
-    // backed by the API; FakeNetworkRepository serves sample data until then.
+    // TODO: when the map moves into the signed-in shell, use
+    // ApiNetworkRepository(auth) with viewerId: '${session.userId}'.
+    // This standalone preview has no session, so it uses sample data.
     runApp(
       MaterialApp(
         theme: AppTheme.light,

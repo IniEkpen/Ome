@@ -9,12 +9,14 @@ class Split {
         this.pool = pool
     }
 
-    async CreateSplit({ groupId, createdBy, title, currency, taxCents, tipCents, items, hostIds, memberIds }) {
+    async CreateSplit({
+        groupId, createdBy, title, merchantName, receiptDate, currency, taxCents, tipCents, items, hostIds, memberIds,
+    }) {
         return withTransaction(async (client) => {
             const created = await client.query(
-                `INSERT INTO splits (group_id, created_by, title, currency, tax_cents, tip_cents)
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-                [groupId, createdBy, title, currency, taxCents, tipCents])
+                `INSERT INTO splits (group_id, created_by, title, merchant_name, receipt_date, currency, tax_cents, tip_cents)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+                [groupId, createdBy, title, merchantName, receiptDate, currency, taxCents, tipCents])
             const splitId = created.rows[0].id
             await client.query(
                 `INSERT INTO split_participants (split_id, user_id, is_host)
@@ -110,6 +112,8 @@ class Split {
             id: split.id,
             groupId: split.group_id,
             title: split.title,
+            merchantName: split.merchant_name,
+            receiptDate: split.receipt_date,
             status: split.status,
             mode: split.split_mode,
             currency: split.currency,
@@ -169,11 +173,14 @@ class Split {
         return result.rowCount > 0
     }
 
-    async SetStatus(client, splitId, status) {
+    // `byUserId` is the host making the change (recorded on confirm).
+    async SetStatus(client, splitId, status, byUserId) {
         await client.query(
             `UPDATE splits SET status = $2::varchar,
-                confirmed_at = CASE WHEN $2::varchar = 'confirmed' THEN now() ELSE confirmed_at END
-             WHERE id = $1`, [splitId, status])
+                confirmed_at = CASE WHEN $2::varchar = 'confirmed' THEN now() ELSE confirmed_at END,
+                confirmed_by = CASE WHEN $2::varchar = 'confirmed' THEN $3::int ELSE confirmed_by END,
+                cancelled_at = CASE WHEN $2::varchar = 'cancelled' THEN now() ELSE cancelled_at END
+             WHERE id = $1`, [splitId, status, byUserId])
     }
 
     // Freezes each person's amount. People with nothing to pay are marked not_required.
@@ -206,17 +213,23 @@ class Split {
         return result.rows
     }
 
-    async SetPaymentStatus(splitId, userId, status, paymentIntentId) {
+    // `errorCode` is Stripe's decline code; it's cleared once a charge succeeds.
+    async SetPaymentStatus(splitId, userId, status, paymentIntentId, errorCode) {
         await this.pool.query(
             `UPDATE split_participants
-             SET payment_status = $3, stripe_payment_intent_id = COALESCE($4, stripe_payment_intent_id)
-             WHERE split_id = $1 AND user_id = $2`, [splitId, userId, status, paymentIntentId || null])
+             SET payment_status = $3::varchar,
+                 stripe_payment_intent_id = COALESCE($4, stripe_payment_intent_id),
+                 payment_error_code = CASE WHEN $3::varchar = 'succeeded' THEN NULL
+                                           ELSE COALESCE($5, payment_error_code) END,
+                 paid_at = CASE WHEN $3::varchar = 'succeeded' THEN COALESCE(paid_at, now()) ELSE paid_at END
+             WHERE split_id = $1 AND user_id = $2`,
+            [splitId, userId, status, paymentIntentId || null, errorCode || null])
     }
 
     // Marks the bill settled once nobody is still waiting to be charged.
     async SettleIfComplete(splitId) {
         const result = await this.pool.query(
-            `UPDATE splits SET status = 'settled', version = version + 1
+            `UPDATE splits SET status = 'settled', settled_at = now(), version = version + 1
              WHERE id = $1 AND status = 'confirmed'
                AND NOT EXISTS (SELECT 1 FROM split_participants
                                WHERE split_id = $1 AND payment_status IN ('pending', 'processing', 'requires_action', 'failed'))

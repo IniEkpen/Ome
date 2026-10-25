@@ -619,6 +619,7 @@ class _Legend extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.background.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(AppRadius.control),
+        boxShadow: AppShadows.card,
       ),
       child: Wrap(
         spacing: 12,

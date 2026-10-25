@@ -14,14 +14,15 @@ abstract final class ApiConfig {
   // Render free instances can take a while to wake up.
   static const timeout = Duration(seconds: 30);
 
-  static Uri uri(String path) {
+  /// Pass query values in [query]; a '?' inside [path] would be escaped.
+  static Uri uri(String path, [Map<String, String>? query]) {
     final base = Uri.parse(baseUrl);
     final isLocal = base.host == 'localhost' || base.host == '10.0.2.2';
     if (base.scheme != 'https' && !isLocal) {
       // Never send credentials over plain HTTP outside local development.
       throw StateError('API_BASE_URL must use https: $baseUrl');
     }
-    return base.replace(path: path);
+    return base.replace(path: path, queryParameters: query);
   }
 }
 
@@ -92,7 +93,8 @@ class ApiClient {
     return headers;
   }
 
-  Future<ApiResponse> get(String path) => _send('GET', path);
+  Future<ApiResponse> get(String path, {Map<String, String>? query}) =>
+      _send('GET', path, query: query);
 
   Future<ApiResponse> post(String path, {Map<String, Object?>? body}) =>
       _send('POST', path, body: body);
@@ -106,8 +108,9 @@ class ApiClient {
     String method,
     String path, {
     Map<String, Object?>? body,
+    Map<String, String>? query,
   }) async {
-    final request = http.Request(method, ApiConfig.uri(path))
+    final request = http.Request(method, ApiConfig.uri(path, query))
       ..headers.addAll(_headers());
     if (method != 'GET') request.body = jsonEncode(body ?? const {});
 

@@ -47,6 +47,8 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     try {
       await AuthScope.read(context).signup(
         username: _username.text.trim(),
+        firstName: _first.text.trim(),
+        lastName: _last.text.trim(),
         email: _email.text.trim(),
         phone: _phone.text.replaceAll(RegExp(r'[\s\-()]'), ''),
         password: _password.text,

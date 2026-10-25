@@ -13,6 +13,7 @@ const MAX_ITEMS = 100
 const MAX_CENTS = 10_000_00 // $10,000 per line / tax / tip
 
 const isInt = (value, min, max) => Number.isInteger(value) && value >= min && value <= max
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 function validateBill(body) {
     const title = typeof body.title === 'string' ? body.title.trim() : ''
@@ -33,7 +34,11 @@ function validateBill(body) {
     if (!isInt(taxCents, 0, MAX_CENTS) || !isInt(tipCents, 0, MAX_CENTS)) {
         throw new HttpError(400, 'Tax and tip must be valid amounts.', 'invalid_extras')
     }
-    return { title, items: cleanItems, taxCents, tipCents }
+    // Optional receipt details (e.g. from the OCR service).
+    const merchantName = typeof body.merchantName === 'string' ? body.merchantName.trim().slice(0, 255) || null : null
+    const receiptDate = typeof body.receiptDate === 'string' && ISO_DATE.test(body.receiptDate)
+        && !Number.isNaN(Date.parse(body.receiptDate)) ? body.receiptDate : null
+    return { title, merchantName, receiptDate, items: cleanItems, taxCents, tipCents }
 }
 
 async function broadcast(splitId) {
@@ -154,7 +159,7 @@ async function confirmSplit(user, splitId) {
     await changeOpenSplit(user, splitId, { hostOnly: true }, async (client) => {
         const totals = SplitModel.Calculate(await Split.Load(splitId, client))
         await Split.FreezeAmounts(client, splitId, totals.perUser)
-        await Split.SetStatus(client, splitId, 'confirmed')
+        await Split.SetStatus(client, splitId, 'confirmed', user.id)
     })
     await broadcast(splitId)
     const result = await payments.chargeSplit(splitId)
@@ -163,7 +168,7 @@ async function confirmSplit(user, splitId) {
 }
 
 async function cancelSplit(user, splitId) {
-    await changeOpenSplit(user, splitId, { hostOnly: true }, (client) => Split.SetStatus(client, splitId, 'cancelled'))
+    await changeOpenSplit(user, splitId, { hostOnly: true }, (client) => Split.SetStatus(client, splitId, 'cancelled', user.id))
     return broadcast(splitId)
 }
 

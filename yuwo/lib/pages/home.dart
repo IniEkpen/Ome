@@ -1,20 +1,102 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/home_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
 import 'home_data.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.data});
+/// The Home tab: loads the signed-in user's bills and activity from the API.
+/// Dev sessions the server didn't issue a token for get sample data instead.
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key});
 
-  /// Defaults to mock entries until balances come from the backend.
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  HomeData? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AuthScope.read(context).session?.token == null) {
+      _data = HomeData.mock();
+    } else {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await HomeService(AuthScope.read(context)).load();
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // Keep what's on screen if a refresh fails.
+      if (_data != null) {
+        showMessage(context, e.message);
+      } else {
+        setState(() => _error = e.message);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _data;
+    if (data != null) {
+      return HomePage(data: data, onRefresh: data.isMock ? null : _load);
+    }
+    return Scaffold(
+      appBar: const YuwoAppBar(),
+      body: PageBody(
+        child: _error == null
+            ? const Center(child: CircularProgressIndicator())
+            : AppCard(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_error!, style: AppText.body),
+                    const SizedBox(height: AppSpacing.field),
+                    OutlinedButton(
+                      onPressed: () {
+                        setState(() => _error = null);
+                        _load();
+                      },
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key, this.data, this.onRefresh});
+
+  /// Defaults to sample entries when no data is given.
   final HomeData? data;
+
+  /// Enables pull-to-refresh when set.
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final home = data ?? HomeData.mock();
     final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
+    final body = _body(home, open);
     return Scaffold(
       appBar: YuwoAppBar(
         actions: [
@@ -25,7 +107,14 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      body: PageBody(
+      body: onRefresh == null
+          ? body
+          : RefreshIndicator(onRefresh: onRefresh!, child: body),
+    );
+  }
+
+  Widget _body(HomeData home, List<HomeBill> open) {
+    return PageBody(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -69,7 +158,6 @@ class HomePage extends StatelessWidget {
             _ActivityList(activity: home.activity),
           ],
         ),
-      ),
     );
   }
 }
@@ -84,6 +172,7 @@ class _SampleDataBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.control),
+        boxShadow: AppShadows.card,
       ),
       child: Text(
         'Sample data',
@@ -177,6 +266,7 @@ class _BillCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.tinted(colors.last),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

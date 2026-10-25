@@ -36,6 +36,36 @@ abstract final class AppRadius {
   static const double tile = 8;
 }
 
+/// Shadows that lift cards off the grey canvas: a tight contact shadow plus
+/// a wide soft one, so boxes look raised rather than printed on the page.
+abstract final class AppShadows {
+  static const card = <BoxShadow>[
+    BoxShadow(color: Color(0x0F000000), blurRadius: 3, offset: Offset(0, 1)),
+    BoxShadow(
+      color: Color(0x17000000),
+      blurRadius: 24,
+      spreadRadius: -2,
+      offset: Offset(0, 10),
+    ),
+  ];
+
+  /// For gradient and dark cards: a glow in the card's own colour reads as
+  /// depth where a grey shadow would look muddy.
+  static List<BoxShadow> tinted(Color color) => [
+    const BoxShadow(
+      color: Color(0x14000000),
+      blurRadius: 4,
+      offset: Offset(0, 2),
+    ),
+    BoxShadow(
+      color: color.withValues(alpha: 0.35),
+      blurRadius: 22,
+      spreadRadius: -4,
+      offset: const Offset(0, 12),
+    ),
+  ];
+}
+
 abstract final class AppSpacing {
   static const double page = 30;
   static const double section = 50;
@@ -137,7 +167,8 @@ abstract final class AppTheme {
           disabledBackgroundColor: Colors.black38,
           disabledForegroundColor: Colors.white70,
           minimumSize: const Size.fromHeight(52),
-          elevation: 0,
+          elevation: 3,
+          shadowColor: Colors.black54,
           shape: controlShape,
           textStyle: AppText.button,
         ),
@@ -164,7 +195,7 @@ abstract final class AppTheme {
         selectedLabelStyle: AppText.sectionTitle,
         unselectedLabelStyle: AppText.sectionTitle,
         type: BottomNavigationBarType.fixed,
-        elevation: 0,
+        elevation: 12,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

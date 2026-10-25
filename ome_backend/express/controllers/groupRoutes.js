@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
         people: row.people,
         status: row.status,
         role: row.role,
+        invitedBy: row.invited_by,
         hasOpenSplit: row.has_open_split,
     })))
 })
@@ -42,11 +43,12 @@ router.post('/', async (req, res) => {
     const requested = Array.isArray(req.body.members) ? req.body.members.filter((m) => typeof m === 'string') : []
     const found = await profile.GetProfilesByUsernames(requested)
     const groupId = await Group.CreateGroup(req.user.id, groupName, found.map((u) => u.id))
-    const foundNames = new Set(found.map((u) => u.username))
+    // Usernames match ignoring case, so compare lowercased.
+    const foundNames = new Set(found.map((u) => u.username.toLowerCase()))
     return res.status(201).json({
         groupId,
-        invited: [...foundNames].filter((name) => name !== req.user.username),
-        notFound: requested.filter((name) => !foundNames.has(name)),
+        invited: found.filter((u) => u.id !== req.user.id).map((u) => u.username),
+        notFound: requested.filter((name) => !foundNames.has(name.toLowerCase())),
     })
 })
 
@@ -67,7 +69,7 @@ router.post('/:groupId/members', async (req, res) => {
     if (membership.role !== 'owner') throw new HttpError(403, 'Only the owner can invite people.', 'owner_only')
     const requested = Array.isArray(req.body?.members) ? req.body.members.filter((m) => typeof m === 'string') : []
     const found = await profile.GetProfilesByUsernames(requested)
-    const invited = await Group.InviteMembers(groupId, found.map((u) => u.id))
+    const invited = await Group.InviteMembers(groupId, req.user.id, found.map((u) => u.id))
     return res.json({ invited })
 })
 
@@ -79,8 +81,10 @@ router.post('/:groupId/leave', async (req, res) => {
 })
 
 router.delete('/:groupId', async (req, res) => {
-    if (!(await Group.DeleteGroup(idParam(req, 'groupId'), req.user.id))) {
-        throw new HttpError(403, 'Only the owner can delete this group.', 'owner_only')
+    const outcome = await Group.DeleteGroup(idParam(req, 'groupId'), req.user.id)
+    if (outcome === 'not_owner') throw new HttpError(403, 'Only the owner can delete this group.', 'owner_only')
+    if (outcome === 'money_pending') {
+        throw new HttpError(409, 'Finish or cancel the open bill, and wait for payouts, before deleting.', 'money_pending')
     }
     return res.status(204).send()
 })

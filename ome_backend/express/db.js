@@ -1,5 +1,9 @@
-const { Pool } = require('pg')
+const { Pool, types } = require('pg')
 const config = require('./config')
+
+// DATE columns stay 'YYYY-MM-DD' strings. The default turns them into a Date
+// at local midnight, which can shift the day when serialised as UTC.
+types.setTypeParser(types.builtins.DATE, (value) => value)
 
 console.log('Database URL Exists:', !!config.databaseUrl)
 

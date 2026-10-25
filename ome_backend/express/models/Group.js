@@ -10,7 +10,7 @@ class Group {
     // Every group the user owns, joined or was invited to, with member names.
     async ListForUser(userId) {
         const query = `
-            SELECT g.id, g.group_name, me.role, me.status,
+            SELECT g.id, g.group_name, me.role, me.status, inviter.username AS invited_by,
                    COALESCE(array_agg(u.username ORDER BY u.username)
                             FILTER (WHERE other.status = 'accepted'), '{}') AS people,
                    EXISTS (SELECT 1 FROM splits s WHERE s.group_id = g.id AND s.status = 'claiming') AS has_open_split
@@ -18,8 +18,9 @@ class Group {
             JOIN groups g ON g.id = me.group_id
             JOIN groupmembers other ON other.group_id = g.id
             JOIN users u ON u.id = other.user_id
+            LEFT JOIN users inviter ON inviter.id = me.invited_by
             WHERE me.user_id = $1
-            GROUP BY g.id, g.group_name, me.role, me.status
+            GROUP BY g.id, g.group_name, me.role, me.status, inviter.username
             ORDER BY g.id DESC;`
         const result = await this.pool.query(query, [userId])
         return result.rows
@@ -47,23 +48,24 @@ class Group {
                 'INSERT INTO groups (group_name, created_by_user) VALUES ($1, $2) RETURNING id', [groupName, ownerId])
             const groupId = created.rows[0].id
             await client.query(
-                `INSERT INTO groupmembers (group_id, user_id, role, status) VALUES ($1, $2, 'owner', 'accepted')`,
+                `INSERT INTO groupmembers (group_id, user_id, role, status, joined_at)
+                 VALUES ($1, $2, 'owner', 'accepted', now())`,
                 [groupId, ownerId])
-            await this.#invite(client, groupId, inviteeIds.filter((id) => id !== ownerId))
+            await this.#invite(client, groupId, ownerId, inviteeIds.filter((id) => id !== ownerId))
             return groupId
         })
     }
 
-    async InviteMembers(groupId, inviteeIds) {
-        return this.#invite(this.pool, groupId, inviteeIds)
+    async InviteMembers(groupId, invitedBy, inviteeIds) {
+        return this.#invite(this.pool, groupId, invitedBy, inviteeIds)
     }
 
-    async #invite(client, groupId, userIds) {
+    async #invite(client, groupId, invitedBy, userIds) {
         if (userIds.length === 0) return 0
         const result = await client.query(
-            `INSERT INTO groupmembers (group_id, user_id, role, status)
-             SELECT $1, unnest($2::int[]), 'member', 'pending'
-             ON CONFLICT ON CONSTRAINT unique_group_user DO NOTHING`, [groupId, userIds])
+            `INSERT INTO groupmembers (group_id, user_id, role, status, invited_by)
+             SELECT $1, unnest($2::int[]), 'member', 'pending', $3
+             ON CONFLICT ON CONSTRAINT unique_group_user DO NOTHING`, [groupId, userIds, invitedBy])
         return result.rowCount
     }
 
@@ -71,7 +73,7 @@ class Group {
     async RespondToInvite(groupId, userId, accept) {
         const result = accept
             ? await this.pool.query(
-                `UPDATE groupmembers SET status = 'accepted'
+                `UPDATE groupmembers SET status = 'accepted', joined_at = now()
                  WHERE group_id = $1 AND user_id = $2 AND status = 'pending'`, [groupId, userId])
             : await this.pool.query(
                 `DELETE FROM groupmembers WHERE group_id = $1 AND user_id = $2 AND status = 'pending'`,
@@ -85,16 +87,25 @@ class Group {
         return result.rowCount > 0
     }
 
-    // Can only delete group if you are owner of the group
+    // Only the owner can delete, and not while money is still moving: members
+    // and bills go with the group (ON DELETE CASCADE), and so would any payout
+    // a host hasn't received yet. Payment history (transactions) is kept.
+    // Returns 'deleted' | 'not_owner' | 'money_pending'.
     async DeleteGroup(groupId, ownerId) {
         return withTransaction(async (client) => {
             const owner = await client.query(
                 `SELECT 1 FROM groupmembers WHERE group_id = $1 AND user_id = $2 AND role = 'owner'`,
                 [groupId, ownerId])
-            if (owner.rowCount === 0) return false
-            await client.query('DELETE FROM groupmembers WHERE group_id = $1', [groupId])
+            if (owner.rowCount === 0) return 'not_owner'
+            const busy = await client.query(
+                `SELECT 1 FROM splits s
+                 WHERE s.group_id = $1
+                   AND (s.status IN ('claiming', 'confirmed')
+                        OR EXISTS (SELECT 1 FROM split_payouts p WHERE p.split_id = s.id AND p.status <> 'paid'))
+                 LIMIT 1`, [groupId])
+            if (busy.rowCount > 0) return 'money_pending'
             await client.query('DELETE FROM groups WHERE id = $1', [groupId])
-            return true
+            return 'deleted'
         })
     }
 }

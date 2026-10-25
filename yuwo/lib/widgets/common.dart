@@ -20,7 +20,7 @@ class YuwoAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// White rounded container used for every card in the app.
+/// White rounded, raised container used for every card in the app.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -47,6 +47,7 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(radius),
+        boxShadow: AppShadows.card,
       ),
       child: child,
     );
@@ -82,6 +83,8 @@ class PageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
+        // Scrollable even when short, so pull-to-refresh works on any page.
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.page),
         child: Center(
           child: ConstrainedBox(

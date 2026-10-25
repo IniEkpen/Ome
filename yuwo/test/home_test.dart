@@ -30,6 +30,36 @@ void main() {
     expect(find.text('Sample data'), findsOneWidget);
   });
 
+  test('parses the /users/me/home response and skips unknown activity', () {
+    final home = HomeData.fromJson({
+      'bills': [
+        {
+          'groupName': 'Dinner',
+          'title': 'Tack Room',
+          'stage': 'charging',
+          'amountCents': 1200,
+          'people': 3,
+          'isHost': false,
+        },
+      ],
+      'activity': [
+        {
+          'kind': 'paid_you',
+          'who': 'bob',
+          'groupName': 'Dinner',
+          'amountCents': 500,
+          'at': '2026-10-20T12:00:00.000Z',
+        },
+        {'kind': 'something_new', 'at': '2026-10-20T12:00:00.000Z'},
+      ],
+    });
+
+    expect(home.bills.single.stage, BillStage.charging);
+    expect(home.youOweCents, 1200);
+    expect(home.activity.single.kind, ActivityKind.paidYou);
+    expect(home.isMock, isFalse);
+  });
+
   testWidgets('empty home shows settled-up states', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

@@ -4,7 +4,8 @@
 //      account with transfer_group = split_<id>.
 //   3. When a charge succeeds, its amount is transferred to the host(s)' Connect
 //      accounts (separate charges and transfers). Hosts who haven't finished
-//      Connect onboarding get the payout once they do.
+//      Connect onboarding get the payout once they do. Each member -> host share
+//      is also written to `transactions`, which the network map and activity feed read.
 const { getStripe, isStripeConfigured } = require('./stripeClient')
 const { profile } = require('../models/Profile')
 const { split: Split } = require('../models/Split')
@@ -118,8 +119,9 @@ async function chargeSplit(splitId, attempt = 'initial') {
             // Card declined or needs the cardholder (3DS) to authenticate.
             const intentId = error.raw?.payment_intent?.id
             const status = error.code === 'authentication_required' ? 'requires_action' : 'failed'
-            console.error(`Charge failed for split ${splitId}, user ${payer.user_id}:`, error.code || error.message)
-            await Split.SetPaymentStatus(splitId, payer.user_id, status, intentId)
+            const reason = error.decline_code || error.code
+            console.error(`Charge failed for split ${splitId}, user ${payer.user_id}:`, reason || error.message)
+            await Split.SetPaymentStatus(splitId, payer.user_id, status, intentId, reason)
         }
     }
     await Split.SettleIfComplete(splitId)
@@ -132,7 +134,7 @@ async function handlePaymentSucceeded(intent) {
     const userId = Number(intent.metadata?.user_id)
     if (!splitId || !userId) return null
     await Split.SetPaymentStatus(splitId, userId, 'succeeded', intent.id)
-    await payoutToHosts(splitId, intent)
+    await payoutToHosts(splitId, userId, intent)
     await Split.SettleIfComplete(splitId)
     return splitId
 }
@@ -141,16 +143,18 @@ async function handlePaymentFailed(intent, status = 'failed') {
     const splitId = Number(intent.metadata?.split_id)
     const userId = Number(intent.metadata?.user_id)
     if (!splitId || !userId) return null
-    await Split.SetPaymentStatus(splitId, userId, status, intent.id)
+    const error = intent.last_payment_error
+    await Split.SetPaymentStatus(splitId, userId, status, intent.id, error?.decline_code || error?.code)
     return splitId
 }
 
 // Co-hosts share each incoming payment evenly.
-async function payoutToHosts(splitId, intent) {
+async function payoutToHosts(splitId, payerId, intent) {
     const hosts = await Split.Hosts(splitId)
     const amount = intent.amount_received ?? intent.amount
     const shares = divideEvenly(amount, hosts.map((h) => h.id))
     for (const host of hosts) {
+        await recordTransaction(splitId, payerId, host.id, shares.get(host.id), intent.id)
         const inserted = await pool.query(
             `INSERT INTO split_payouts (split_id, host_user_id, source_payment_intent_id, amount_cents)
              VALUES ($1, $2, $3, $4)
@@ -181,12 +185,41 @@ async function sendPayout(payoutId) {
             // Ties the transfer to the charge so it waits for those funds to be available.
             source_transaction: intent.latest_charge,
         }, { idempotencyKey: `payout-${payout.id}` })
-        await pool.query(`UPDATE split_payouts SET status = 'paid', stripe_transfer_id = $2 WHERE id = $1`,
+        await pool.query(
+            `UPDATE split_payouts SET status = 'paid', stripe_transfer_id = $2, paid_at = now() WHERE id = $1`,
             [payout.id, transfer.id])
     } catch (error) {
         console.error(`Payout ${payout.id} failed:`, error.code || error.message)
         await pool.query(`UPDATE split_payouts SET status = 'failed' WHERE id = $1`, [payout.id])
     }
+}
+
+// Payer -> host history. Privacy follows the payer's setting at the time.
+// The unique (payment intent, recipient) key makes webhook retries harmless.
+async function recordTransaction(splitId, payerId, hostId, amountCents, paymentIntentId) {
+    if (!amountCents || payerId === hostId) return
+    await pool.query(
+        `INSERT INTO transactions (sender_id, recipient_id, amount_cents, currency, split_id, group_id,
+                                   stripe_payment_intent_id, is_private, note)
+         SELECT payer.id, $2, $3, s.currency, s.id, s.group_id, $4, payer.transactions_private, s.title
+         FROM splits s JOIN users payer ON payer.id = $1
+         WHERE s.id = $5
+         ON CONFLICT (stripe_payment_intent_id, recipient_id) DO NOTHING`,
+        [payerId, hostId, amountCents, paymentIntentId, splitId])
+}
+
+// Stripe delivers events at least once. Returns false when this event was
+// already handled; one that failed half way has no processed_at and runs again.
+async function beginWebhookEvent(event) {
+    const { rows } = await pool.query(
+        `INSERT INTO stripe_webhook_events (id, type) VALUES ($1, $2)
+         ON CONFLICT (id) DO UPDATE SET received_at = now()
+         RETURNING processed_at`, [event.id, event.type])
+    return rows[0].processed_at === null
+}
+
+async function finishWebhookEvent(event) {
+    await pool.query('UPDATE stripe_webhook_events SET processed_at = now() WHERE id = $1', [event.id])
 }
 
 // When a host finishes Connect onboarding, send anything that was waiting for them.
@@ -205,4 +238,6 @@ module.exports = {
     handlePaymentSucceeded,
     handlePaymentFailed,
     releasePendingPayouts,
+    beginWebhookEvent,
+    finishWebhookEvent,
 }

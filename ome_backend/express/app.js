@@ -6,8 +6,15 @@ const userRoutes = require('./controllers/userRoutes')
 const groupRoutes = require('./controllers/groupRoutes')
 const splitRoutes = require('./controllers/splitRoutes')
 const payments = require('./controllers/paymentRoutes')
+const networkRoutes = require('./controllers/networkRoutes')
+const { pool } = require('./db')
 
 const app = express()
+
+// Render (and most hosts) sit behind one proxy; this makes req.ip the
+// client's address, which the login rate limit keys on.
+app.set('trust proxy', 1)
+app.disable('x-powered-by')
 
 // The mobile app doesn't need CORS; only listed browser origins are allowed.
 app.use(cors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false }))
@@ -18,10 +25,20 @@ app.post('/payments/webhook', express.raw({ type: 'application/json' }), payment
 app.use(express.json({ limit: '100kb' }))
 
 app.get('/', (req, res) => res.json({ ok: true }))
+// For the host's health check: also confirms the database answers.
+app.get('/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1')
+        return res.json({ ok: true, database: 'up' })
+    } catch (error) {
+        return res.status(503).json({ ok: false, database: 'down' })
+    }
+})
 app.use('/users', userRoutes)
 app.use('/groups', groupRoutes)
 app.use('/splits', splitRoutes)
 app.use('/payments', payments.router)
+app.use('/network', networkRoutes)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 
