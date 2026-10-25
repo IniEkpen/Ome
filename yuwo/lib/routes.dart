@@ -48,7 +48,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selected = 0;
 
-  static const _pages = <Widget>[HomePage(), GroupsPage(), ProfilePage()];
+  static const _pages = <Widget>[HomeTab(), GroupsPage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {

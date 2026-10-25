@@ -34,6 +34,7 @@ class GroupInvite extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
         ),
         child: Row(
           children: [
@@ -69,6 +70,7 @@ class _InviteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.textPrimary,
         borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.tinted(AppColors.textPrimary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,11 +90,10 @@ class _InviteCard extends StatelessWidget {
               _MemberStack(people: group.people),
             ],
           ),
-          // ASSUMPTION: no "invited by" field exists on Group yet.
-          // Add an `invitedBy` field to Group/fromJson if your API sends one,
-          // then swap this back to something like "${group.invitedBy} invited you...".
           Text(
-            "You've been invited to join ${group.groupname}",
+            group.invitedBy == null
+                ? "You've been invited to join ${group.groupname}"
+                : "${group.invitedBy} invited you to join ${group.groupname}",
             style: AppText.caption,
           ),
           const Spacer(),

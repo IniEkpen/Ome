@@ -19,6 +19,7 @@ async function webhook(req, res) {
     } catch (error) {
         return res.status(400).json({ error: 'Invalid signature' })
     }
+    if (!(await payments.beginWebhookEvent(event))) return res.json({ received: true, duplicate: true })
 
     const object = event.data.object
     let splitId = null
@@ -43,6 +44,7 @@ async function webhook(req, res) {
         default:
             break
     }
+    await payments.finishWebhookEvent(event)
     // Push payment status changes to anyone with the popup open.
     if (splitId) await splits.broadcast(splitId)
     return res.json({ received: true })

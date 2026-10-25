@@ -28,6 +28,7 @@ class Joined extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,8 +72,10 @@ class Joined extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(AppRadius.card),
+                  // The bottom card lifts the whole stack; the rest cast
+                  // upward onto the card beneath them.
                   boxShadow: index == 0
-                      ? null
+                      ? AppShadows.tinted(colors.last)
                       : [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.12),

@@ -6,6 +6,7 @@ class GroupModel {
   final String status; // 'pending' | 'accepted'
   final String role; // 'owner' | 'member'
   final bool hasOpenSplit;
+  final String? invitedBy; // username of whoever sent a pending invite
 
   GroupModel({
     required this.id,
@@ -14,6 +15,7 @@ class GroupModel {
     required this.status,
     this.role = 'member',
     this.hasOpenSplit = false,
+    this.invitedBy,
   });
 
   bool get isOwner => role == 'owner';
@@ -26,6 +28,7 @@ class GroupModel {
       status: json['status'] as String,
       role: json['role'] as String? ?? 'member',
       hasOpenSplit: json['hasOpenSplit'] == true,
+      invitedBy: json['invitedBy'] as String?,
     );
   }
 
@@ -37,6 +40,7 @@ class GroupModel {
       'status': status,
       'role': role,
       'hasOpenSplit': hasOpenSplit,
+      'invitedBy': invitedBy,
     };
   }
 
@@ -53,6 +57,7 @@ class GroupModel {
       status: status ?? this.status,
       role: role,
       hasOpenSplit: hasOpenSplit,
+      invitedBy: invitedBy,
     );
   }
 }

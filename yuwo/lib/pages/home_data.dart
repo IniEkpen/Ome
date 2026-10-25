@@ -1,14 +1,20 @@
-// What the home page shows. Mock entries for now; swap [HomeData.mock] for
-// data loaded from the API (open splits + payment history) when it exists.
+// What the home page shows, as returned by GET /users/me/home.
+// [HomeData.mock] is sample data for dev sessions without a server token.
 
 enum BillStage {
-  pickItems('Pick your items'),
-  waitingOnHost('Waiting on host'),
-  charging('Charging cards'),
-  paid('Paid');
+  pickItems('Pick your items', 'pick_items'),
+  waitingOnHost('Waiting on host', 'waiting_on_host'),
+  charging('Charging cards', 'charging'),
+  paid('Paid', 'paid');
 
-  const BillStage(this.label);
+  const BillStage(this.label, this.apiName);
   final String label;
+  final String apiName;
+
+  static BillStage fromApi(Object? name) => values.firstWhere(
+    (stage) => stage.apiName == name,
+    orElse: () => waitingOnHost,
+  );
 }
 
 /// A bill in one of your groups that isn't finished yet.
@@ -30,9 +36,33 @@ class HomeBill {
   final int amountCents;
   final int people;
   final bool isHost;
+
+  factory HomeBill.fromJson(Map<String, dynamic> json) => HomeBill(
+    groupName: json['groupName'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    stage: BillStage.fromApi(json['stage']),
+    amountCents: json['amountCents'] as int? ?? 0,
+    people: json['people'] as int? ?? 0,
+    isHost: json['isHost'] == true,
+  );
 }
 
-enum ActivityKind { youPaid, paidYou, waived, joined }
+enum ActivityKind {
+  youPaid('you_paid'),
+  paidYou('paid_you'),
+  waived('waived'),
+  joined('joined');
+
+  const ActivityKind(this.apiName);
+  final String apiName;
+
+  static ActivityKind? fromApi(Object? name) {
+    for (final kind in values) {
+      if (kind.apiName == name) return kind;
+    }
+    return null;
+  }
+}
 
 class HomeActivity {
   const HomeActivity({
@@ -48,6 +78,20 @@ class HomeActivity {
   final String groupName;
   final DateTime when;
   final int amountCents;
+
+  /// Null for kinds this version of the app doesn't know how to show.
+  static HomeActivity? fromJson(Map<String, dynamic> json) {
+    final kind = ActivityKind.fromApi(json['kind']);
+    final when = DateTime.tryParse(json['at'] as String? ?? '');
+    if (kind == null || when == null) return null;
+    return HomeActivity(
+      kind: kind,
+      who: json['who'] as String? ?? '',
+      groupName: json['groupName'] as String? ?? '',
+      when: when.toLocal(),
+      amountCents: json['amountCents'] as int? ?? 0,
+    );
+  }
 }
 
 class HomeData {
@@ -60,6 +104,17 @@ class HomeData {
   final List<HomeBill> bills;
   final List<HomeActivity> activity;
   final bool isMock;
+
+  factory HomeData.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> rows(String key) => [
+      for (final row in json[key] as List? ?? const [])
+        if (row is Map<String, dynamic>) row,
+    ];
+    return HomeData(
+      bills: rows('bills').map(HomeBill.fromJson).toList(),
+      activity: rows('activity').map(HomeActivity.fromJson).nonNulls.toList(),
+    );
+  }
 
   /// Your share of bills you haven't paid yet.
   int get youOweCents => bills

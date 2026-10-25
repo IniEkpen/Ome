@@ -4,9 +4,13 @@ import 'package:flutter/widgets.dart';
 import 'api_client.dart';
 
 class Session {
-  const Session({required this.username, this.token});
+  const Session({required this.username, this.token, this.userId});
 
   final String username;
+
+  /// Server id, used where the API refers to people by id (the network map).
+  /// Null for local dev sessions the server didn't issue.
+  final int? userId;
 
   /// Bearer token issued by the backend, sent on every request.
   final String? token;
@@ -75,9 +79,11 @@ class AuthService extends ChangeNotifier {
         (token == null && (userExists == null || userExists == false))) {
       throw _invalidCredentials;
     }
+    final id = json?['id'];
     _session = Session(
       username: username,
       token: token is String ? token : null,
+      userId: id is int ? id : null,
     );
     notifyListeners();
   }
@@ -87,11 +93,15 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String phone,
     required String password,
+    String? firstName,
+    String? lastName,
   }) async {
     final response = await _client.post(
       '/users/signup',
       body: {
         'username': username,
+        'firstName': firstName,
+        'lastName': lastName,
         'email': email,
         'phone': phone,
         'password': password,
