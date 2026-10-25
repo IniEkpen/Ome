@@ -17,7 +17,7 @@ app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
 // The mobile app doesn't need CORS; only listed browser origins are allowed.
-app.use(cors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false }))
+app.use(cors({ origin:app.use(cors({ origin: 'http://localhost:3000' }))}))
 
 // Stripe webhook needs the raw body, so it's registered before express.json().
 app.post('/payments/webhook', express.raw({ type: 'application/json' }), payments.webhook)
