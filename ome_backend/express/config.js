@@ -1,4 +1,6 @@
-require('dotenv').config()
+const path = require('path')
+// ome_backend/.env, whichever folder the command is run from (npm scripts run from the repo root).
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true })
 
 // Every secret comes from the environment (.env locally, the host's dashboard
 // in production). Nothing sensitive is ever hardcoded or sent to the client.

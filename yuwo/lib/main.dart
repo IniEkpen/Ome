@@ -19,9 +19,8 @@ Future<void> main() async {
   // the network map preview on its own instead:
   //   flutter run --dart-define=PREVIEW=network
   if (const String.fromEnvironment('PREVIEW') == 'network') {
-    // TODO: when the map moves into the signed-in shell, use
-    // ApiNetworkRepository(auth) with viewerId: '${session.userId}'.
-    // This standalone preview has no session, so it uses sample data.
+    // The signed-in app has the live map in its Network tab. This standalone
+    // preview has no session, so it uses sample data.
     runApp(
       MaterialApp(
         theme: AppTheme.light,

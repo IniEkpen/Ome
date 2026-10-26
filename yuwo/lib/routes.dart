@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'networkmap.dart';
 import 'pages/account.dart';
 import 'pages/group.dart';
 import 'pages/home.dart';
 import 'pages/login.dart';
 import 'pages/profile.dart';
+import 'preview_network.dart';
 import 'services/auth_service.dart';
+import 'services/network_service.dart';
 
 abstract final class AppRoutes {
   static const root = '/';
@@ -48,7 +51,12 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selected = 0;
 
-  static const _pages = <Widget>[HomeTab(), GroupsPage(), ProfilePage()];
+  static const _pages = <Widget>[
+    HomeTab(),
+    GroupsPage(),
+    NetworkTab(),
+    ProfilePage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +68,29 @@ class _AppShellState extends State<AppShell> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Groups'),
+          BottomNavigationBarItem(icon: Icon(Icons.hub), label: 'Network'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
+    );
+  }
+}
+
+/// The network map for the signed-in user. Dev sessions the server didn't
+/// issue a token for get sample data, like the home page.
+class NetworkTab extends StatelessWidget {
+  const NetworkTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthScope.of(context);
+    final userId = auth.session?.userId;
+    if (auth.session?.token == null || userId == null) {
+      return Network(viewerId: 'me', repository: FakeNetworkRepository());
+    }
+    return Network(
+      viewerId: '$userId',
+      repository: ApiNetworkRepository(auth),
     );
   }
 }
