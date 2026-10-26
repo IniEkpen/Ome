@@ -40,6 +40,24 @@ class GroupService {
     )).orThrow("Couldn't update that invite.");
   }
 
+  /// Owner only. Returns how many new invites were sent; usernames that
+  /// don't exist or are already in the group are skipped.
+  Future<int> inviteMembers(int groupId, List<String> members) async {
+    final response = (await _auth.client.post(
+      '/groups/$groupId/members',
+      body: {'members': members},
+    )).orThrow("We couldn't send those invites.");
+    final invited = response.json?['invited'];
+    return invited is int ? invited : 0;
+  }
+
+  /// Members only; owners delete the group instead.
+  Future<void> leaveGroup(int groupId) async {
+    (await _auth.client.post(
+      '/groups/$groupId/leave',
+    )).orThrow("We couldn't take you out of that group.");
+  }
+
   /// Only call after the user has confirmed in the UI.
   Future<void> deleteGroup(int groupId) async {
     (await _auth.client.delete(

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../groups/groupmodel.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/group_service.dart';
 import '../splits/split_checkout.dart';
 import '../splits/split_model.dart';
 import '../splits/split_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
+import '../utils/validators.dart';
 import '../widgets/common.dart';
 import 'new_bill.dart';
 
@@ -65,6 +68,59 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     if (split != null) _live.apply(split);
   }
 
+  Future<void> _invite() async {
+    final members = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => const _InviteDialog(),
+    );
+    if (members == null || members.isEmpty || !mounted) return;
+    try {
+      final invited = await GroupService(
+        AuthScope.read(context),
+      ).inviteMembers(widget.group.id, members);
+      if (!mounted) return;
+      showMessage(
+        context,
+        invited == 0
+            ? 'No new invites sent. Check the usernames, or they may already be in the group.'
+            : 'Sent $invited invite${invited == 1 ? '' : 's'}.',
+      );
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    }
+  }
+
+  Future<void> _leave() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave this group?'),
+        content: Text(
+          "You won't see ${widget.group.groupname}'s bills any more. The owner "
+          'can invite you back.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await GroupService(AuthScope.read(context)).leaveGroup(widget.group.id);
+      // The groups list reloads when this page closes.
+      if (mounted) Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
@@ -74,6 +130,20 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           group.groupname,
           style: AppText.sectionTitle.copyWith(fontSize: 16),
         ),
+        actions: [
+          if (group.isOwner)
+            IconButton(
+              tooltip: 'Invite people',
+              icon: const Icon(Icons.person_add_alt),
+              onPressed: _invite,
+            )
+          else
+            IconButton(
+              tooltip: 'Leave group',
+              icon: const Icon(Icons.logout),
+              onPressed: _leave,
+            ),
+        ],
       ),
       body: PageBody(
         child: ListenableBuilder(
@@ -118,6 +188,76 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Asks for usernames and returns them, or null when cancelled.
+class _InviteDialog extends StatefulWidget {
+  const _InviteDialog();
+
+  @override
+  State<_InviteDialog> createState() => _InviteDialogState();
+}
+
+class _InviteDialogState extends State<_InviteDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _members = TextEditingController();
+
+  @override
+  void dispose() {
+    _members.dispose();
+    super.dispose();
+  }
+
+  List<String> get _memberList => _members.text
+      .split(',')
+      .map((m) => m.trim())
+      .where((m) => m.isNotEmpty)
+      .toSet()
+      .toList();
+
+  String? _validate(String? _) {
+    if (_memberList.isEmpty) return 'Enter at least one username';
+    for (final member in _memberList) {
+      if (Validators.username(member) != null) {
+        return '"$member" is not a valid username';
+      }
+    }
+    return null;
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.of(context).pop(_memberList);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Invite people'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _members,
+          autofocus: true,
+          autocorrect: false,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _submit(),
+          decoration: const InputDecoration(
+            hintText: 'Usernames, comma separated',
+          ),
+          validator: _validate,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(onPressed: _submit, child: const Text('Invite')),
+      ],
     );
   }
 }

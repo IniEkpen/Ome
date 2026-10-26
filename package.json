@@ -7,7 +7,8 @@
     "start": "node ome_backend/express/server.js",
     "dev": "node --watch ome_backend/express/server.js",
     "test": "node --test \"ome_backend/express/test/*.test.js\"",
-    "migrate": "node ome_backend/db/migrate.js"
+    "migrate": "node ome_backend/db/migrate.js",
+    "seed": "node ome_backend/db/seed.js"
   },
   "repository": {
     "type": "git",

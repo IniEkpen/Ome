@@ -102,6 +102,9 @@ class ApiClient {
   Future<ApiResponse> put(String path, {Map<String, Object?>? body}) =>
       _send('PUT', path, body: body);
 
+  Future<ApiResponse> patch(String path, {Map<String, Object?>? body}) =>
+      _send('PATCH', path, body: body);
+
   Future<ApiResponse> delete(String path) => _send('DELETE', path);
 
   Future<ApiResponse> _send(
