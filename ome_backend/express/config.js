@@ -22,6 +22,8 @@ const config = {
 
     // Comma separated list of origins allowed to call the API from a browser.
     corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+    // Lets the Flutter web app on any localhost port call the API. Off when NODE_ENV=production.
+    allowLocalhostOrigins: process.env.NODE_ENV !== 'production',
 }
 
 module.exports = config
