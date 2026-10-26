@@ -16,8 +16,16 @@ const app = express()
 app.set('trust proxy', 1)
 app.disable('x-powered-by')
 
-// The mobile app doesn't need CORS; only listed browser origins are allowed.
-app.use(cors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false }))
+// The mobile app doesn't need CORS; only listed browser origins are allowed,
+// plus any localhost port outside production (`flutter run -d chrome` picks
+// a new port each run). Login uses bearer tokens, not cookies, so a page
+// can't borrow someone's session through this.
+const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+app.use(cors({
+    origin: (origin, callback) => callback(null, Boolean(origin) && (
+        config.corsOrigins.includes(origin) || (config.allowLocalhostOrigins && LOCALHOST.test(origin))
+    )),
+}))
 
 // Stripe webhook needs the raw body, so it's registered before express.json().
 app.post('/payments/webhook', express.raw({ type: 'application/json' }), payments.webhook)
