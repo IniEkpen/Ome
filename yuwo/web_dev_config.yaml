@@ -1,0 +1,6 @@
+# Settings for `flutter run -d chrome` (read from this folder).
+server:
+  # Fixed so Google sign-in works: the Web OAuth client in Google Cloud only
+  # allows http://localhost:5000. Change both together.
+  host: localhost
+  port: 5000

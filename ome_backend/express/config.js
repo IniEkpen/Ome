@@ -2,6 +2,8 @@ const path = require('path')
 // ome_backend/.env, whichever folder the command is run from (npm scripts run from the repo root).
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true })
 
+const list = (value) => (value || '').split(',').map((v) => v.trim()).filter(Boolean)
+
 // Every secret comes from the environment (.env locally, the host's dashboard
 // in production). Nothing sensitive is ever hardcoded or sent to the client.
 const config = {
@@ -24,8 +26,27 @@ const config = {
         currency: process.env.STRIPE_CURRENCY || 'usd',
     },
 
+    // "Continue with Google". Comma separated OAuth client ids whose ID tokens
+    // we accept: the iOS client id and the Web client id from Google Cloud.
+    google: {
+        clientIds: list(process.env.GOOGLE_CLIENT_IDS),
+    },
+
+    // "Sign in with Apple".
+    apple: {
+        // Accepted token audiences: the app's bundle id (and a Services ID if
+        // you add Apple sign-in on the web).
+        clientIds: list(process.env.APPLE_CLIENT_IDS),
+        // For revoking Apple access when an account is deleted. From
+        // developer.apple.com > Keys (a key with Sign in with Apple enabled).
+        teamId: process.env.APPLE_TEAM_ID,
+        keyId: process.env.APPLE_KEY_ID,
+        // Contents of the .p8 file; "\n" escapes are turned into newlines.
+        privateKey: (process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    },
+
     // Comma separated list of origins allowed to call the API from a browser.
-    corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),
+    corsOrigins: list(process.env.CORS_ORIGINS),
     // Lets a browser on any host and port call the API. Off when NODE_ENV=production.
     allowAnyOrigin: process.env.NODE_ENV !== 'production',
 }

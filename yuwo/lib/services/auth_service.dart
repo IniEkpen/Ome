@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api_client.dart';
+import 'social_sign_in.dart';
 
 class Session {
   const Session({required this.username, this.token, this.userId});
@@ -133,16 +134,62 @@ class AuthService extends ChangeNotifier {
         (token == null && (userExists == null || userExists == false))) {
       throw _invalidCredentials;
     }
-    final id = json?['id'];
+    // Older servers answered UserExists without a token; keep accepting that.
+    _acceptSignIn(json!, fallbackUsername: username, requireToken: false);
+  }
+
+  /// "Continue with Google": [idToken] comes from the google_sign_in plugin.
+  /// Returns true when this created a new account.
+  Future<bool> signInWithGoogle(String idToken) async {
+    final response = (await _client.post(
+      '/users/oauth/google',
+      body: {'idToken': idToken},
+    )).orThrow("We couldn't sign you in with Google. Please try again.");
+    return _acceptSignIn(response.json ?? const {});
+  }
+
+  /// "Sign in with Apple". Apple only shares the person's name with the app,
+  /// and only the first time, so it's passed along here. [rawNonce] is the
+  /// value whose SHA-256 was given to Apple.
+  Future<bool> signInWithApple({
+    required String identityToken,
+    required String rawNonce,
+    String? authorizationCode,
+    String? firstName,
+    String? lastName,
+  }) async {
+    final response = (await _client.post(
+      '/users/oauth/apple',
+      body: {
+        'identityToken': identityToken,
+        'nonce': rawNonce,
+        'authorizationCode': authorizationCode,
+        'firstName': firstName,
+        'lastName': lastName,
+      },
+    )).orThrow("We couldn't sign you in with Apple. Please try again.");
+    return _acceptSignIn(response.json ?? const {});
+  }
+
+  /// Stores the session from a successful sign-in response. Returns whether
+  /// the server just created the account.
+  bool _acceptSignIn(
+    Map<String, dynamic> json, {
+    String fallbackUsername = '',
+    bool requireToken = true,
+  }) {
+    final token = json['token'];
+    final id = json['id'];
+    final username = json['username'];
+    if (token is! String && requireToken) throw _invalidCredentials;
     _setSession(
       Session(
-        username: json?['username'] is String
-            ? json!['username'] as String
-            : username,
+        username: username is String ? username : fallbackUsername,
         token: token is String ? token : null,
         userId: id is int ? id : null,
       ),
     );
+    return json['isNewUser'] == true;
   }
 
   void _setSession(Session? session) {
@@ -200,7 +247,11 @@ class AuthService extends ChangeNotifier {
     await login(username: username, password: password);
   }
 
-  void logout() => _setSession(null);
+  void logout() {
+    _setSession(null);
+    // So the next "Continue with Google" shows the account picker.
+    SocialSignIn.signOut();
+  }
 
   /// Permanently deletes the account on the server, then signs out.
   /// Throws an [ApiException] (code `money_pending`) while money is moving.

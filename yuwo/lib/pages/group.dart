@@ -19,11 +19,7 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _groupName = TextEditingController();
-  final _members = TextEditingController();
   late final GroupsState _groups;
-  bool _loading = false;
 
   @override
   void initState() {
@@ -34,9 +30,95 @@ class _GroupsPageState extends State<GroupsPage> {
 
   @override
   void dispose() {
+    _groups.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createGroup() async {
+    final message = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (_) => const _CreateGroupSheet(),
+    );
+    if (message == null || !mounted) return;
+    showMessage(context, message);
+    await _groups.loadAll();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider.value(
+      value: _groups,
+      child: Scaffold(
+        appBar: YuwoAppBar(
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton.filled(
+                tooltip: 'Create group',
+                icon: const Icon(Icons.add),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.textPrimary,
+                  foregroundColor: AppColors.surface,
+                ),
+                onPressed: _createGroup,
+              ),
+            ),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _groups.loadAll,
+          child: const PageBody(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(
+                  'Invites',
+                  subtitle: 'A card on file is required to join',
+                ),
+                SizedBox(height: AppSpacing.field),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  child: GroupInvite(),
+                ),
+                SizedBox(height: AppSpacing.section),
+                SectionHeader(
+                  'Your Groups',
+                  subtitle: 'Tap a group to open its bill',
+                ),
+                SizedBox(height: AppSpacing.field),
+                Joined(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opened from the + button. Closes with a message to show once the group
+/// is created, or null if cancelled.
+class _CreateGroupSheet extends StatefulWidget {
+  const _CreateGroupSheet();
+
+  @override
+  State<_CreateGroupSheet> createState() => _CreateGroupSheetState();
+}
+
+class _CreateGroupSheetState extends State<_CreateGroupSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _groupName = TextEditingController();
+  final _members = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
     _groupName.dispose();
     _members.dispose();
-    _groups.dispose();
     super.dispose();
   }
 
@@ -70,91 +152,59 @@ class _GroupsPageState extends State<GroupsPage> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (!created) return;
-    showMessage(
-      context,
+    Navigator.of(context).pop(
       notFound.isEmpty
           ? 'Group "$name" created. Invites sent.'
           : 'Group "$name" created. No account for: ${notFound.join(', ')}',
     );
-    _formKey.currentState!.reset();
-    _groupName.clear();
-    _members.clear();
-    await _groups.loadAll();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _groups,
-      child: Scaffold(
-        appBar: const YuwoAppBar(),
-        body: RefreshIndicator(
-          onRefresh: _groups.loadAll,
-          child: PageBody(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SectionHeader(
-                  'Invites',
-                  subtitle: 'A card on file is required to join',
-                ),
-                const SizedBox(height: AppSpacing.field),
-                const SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  child: GroupInvite(),
-                ),
-                const SizedBox(height: AppSpacing.section),
-                const SectionHeader(
-                  'Your Groups',
-                  subtitle: 'Tap a group to open its bill',
-                ),
-                const SizedBox(height: AppSpacing.field),
-                const Joined(),
-                const SizedBox(height: AppSpacing.section),
-                const SectionHeader(
-                  'Create a Group',
-                  subtitle: 'A card on file is required to create a group',
-                ),
-                const SizedBox(height: AppSpacing.field),
-                AppCard(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _groupName,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            hintText: 'Group Name',
-                          ),
-                          validator: Validators.name,
-                        ),
-                        const SizedBox(height: AppSpacing.field),
-                        TextFormField(
-                          controller: _members,
-                          autocorrect: false,
-                          textInputAction: TextInputAction.done,
-                          onFieldSubmitted: (_) => _submit(),
-                          decoration: const InputDecoration(
-                            hintText: 'Members (usernames, comma separated)',
-                          ),
-                          validator: _validateMembers,
-                        ),
-                        const SizedBox(height: AppSpacing.gap),
-                        LoadingButton(
-                          label: 'Create Group',
-                          loading: _loading,
-                          onPressed: _submit,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+    return Padding(
+      // Keeps the form above the keyboard.
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        0,
+        AppSpacing.page,
+        MediaQuery.viewInsetsOf(context).bottom + AppSpacing.page,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionHeader(
+              'Create a Group',
+              subtitle: 'A card on file is required to create a group',
             ),
-          ),
+            const SizedBox(height: AppSpacing.gap),
+            TextFormField(
+              controller: _groupName,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(hintText: 'Group Name'),
+              validator: Validators.name,
+            ),
+            const SizedBox(height: AppSpacing.field),
+            TextFormField(
+              controller: _members,
+              autocorrect: false,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submit(),
+              decoration: const InputDecoration(
+                hintText: 'Members (usernames, comma separated)',
+              ),
+              validator: _validateMembers,
+            ),
+            const SizedBox(height: AppSpacing.gap),
+            LoadingButton(
+              label: 'Create Group',
+              loading: _loading,
+              onPressed: _submit,
+            ),
+          ],
         ),
       ),
     );

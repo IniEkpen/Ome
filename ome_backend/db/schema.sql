@@ -30,8 +30,16 @@ CREATE TABLE IF NOT EXISTS users (
     last_name                   VARCHAR(100),
     email                       VARCHAR(255),
     phone                       VARCHAR(32),
-    -- scrypt$<salt>$<hash> (see express/auth.js)
+    -- scrypt$<salt>$<hash> (see express/auth.js). NULL for people who only
+    -- sign in with Google or Apple.
     password                    TEXT,
+    -- Stable account ids from "Continue with Google" / "Sign in with Apple"
+    -- (the token's `sub`). Never the email, which people can change.
+    google_sub                  TEXT,
+    apple_sub                   TEXT,
+    -- Lets us revoke Sign in with Apple when the account is deleted, which
+    -- App Review requires.
+    apple_refresh_token         TEXT,
     -- Default for payments this user makes: private ones stay off the
     -- public network map and are only shown to the two people involved.
     transactions_private        BOOLEAN NOT NULL DEFAULT false,
@@ -72,6 +80,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAU
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_refresh_token TEXT;
 -- Replaced by the card columns above; nothing reads it any more.
 ALTER TABLE users DROP COLUMN IF EXISTS card_info;
 
@@ -79,6 +90,8 @@ ALTER TABLE users DROP COLUMN IF EXISTS card_info;
 -- person). On an old database this fails if duplicates exist: rename them first.
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_key ON users (lower(username));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key ON users (lower(email)) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_key ON users (google_sub) WHERE google_sub IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS users_apple_sub_key ON users (apple_sub) WHERE apple_sub IS NOT NULL;
 -- Prefix search for the network map ("find a person").
 CREATE INDEX IF NOT EXISTS users_username_search ON users (lower(username) text_pattern_ops);
 

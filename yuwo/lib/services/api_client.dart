@@ -1,15 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Base URL can be overridden at build time:
+/// Where the API is. `flutter run -d chrome` (a debug web build) talks to
+/// the server on this computer (`npm run dev`); phones and release builds
+/// use the deployed one. Override either way at build time:
 ///   flutter run --dart-define=API_BASE_URL=https://staging.example.com
 abstract final class ApiConfig {
-  static const baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://ome-o9wx.onrender.com',
-  );
+  static const _override = String.fromEnvironment('API_BASE_URL');
+  static const _deployed = 'https://ome-o9wx.onrender.com';
+  static const _local = 'http://localhost:3000';
+
+  static String get baseUrl => _override.isNotEmpty
+      ? _override
+      : kDebugMode && kIsWeb
+      ? _local
+      : _deployed;
 
   // Render free instances can take a while to wake up.
   static const timeout = Duration(seconds: 30);
