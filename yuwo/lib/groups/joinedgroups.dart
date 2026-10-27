@@ -33,8 +33,11 @@ class Joined extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Apart of No Groups", style: AppText.sectionTitle),
-            Text("Tap + to start one", style: AppText.caption),
+            Text(
+              "You're not part of any groups yet",
+              style: AppText.sectionTitle,
+            ),
+            Text("Tap + at the top to create one", style: AppText.caption),
           ],
         ),
       );
