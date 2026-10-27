@@ -2,4 +2,4 @@
 // From Google Cloud Console > APIs & Services > Credentials > your iOS
 // OAuth client: copy its "iOS URL scheme" (the client id, reversed) here.
 // It lets Google hand the signed-in user back to the app.
-GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE_WITH_YOUR_IOS_CLIENT_ID
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.236020339900-q76lub834imsf77m5qrb737ce419mj90
