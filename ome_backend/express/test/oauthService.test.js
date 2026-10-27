@@ -6,7 +6,7 @@ const config = require('../config')
 const oauth = require('../services/oauthService')
 
 const GOOGLE_CLIENT = 'ios-client.apps.googleusercontent.com'
-const APPLE_CLIENT = 'com.example.yuwo'
+const APPLE_CLIENT = 'app.yuwo'
 
 let key, otherKey
 test.before(async () => {

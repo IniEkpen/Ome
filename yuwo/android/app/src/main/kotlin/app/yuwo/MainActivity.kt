@@ -1,4 +1,4 @@
-package com.example.yuwo
+package app.yuwo
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
