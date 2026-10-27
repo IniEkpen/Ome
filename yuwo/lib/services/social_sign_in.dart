@@ -8,15 +8,31 @@ import 'package:google_sign_in/google_sign_in.dart';
 /// Settings and helpers for "Continue with Google" and "Sign in with Apple".
 /// Both are off until configured, so the app works the same without them.
 ///
-/// Pass the Google client id at build time:
-/// ```
-///   iPhone:  --dart-define=GOOGLE_CLIENT_ID=<iOS client id>
-///   Chrome:  --dart-define=GOOGLE_CLIENT_ID=<Web client id>
-///   Android: --dart-define=GOOGLE_SERVER_CLIENT_ID=<Web client id>
-/// ```
+/// Google OAuth client ids from the Yuwo project in Google Cloud. They're
+/// public (Google expects them inside apps), so they're built in: the iOS
+/// one on iPhone, the Web one in Chrome. Override at build time with
+/// `--dart-define=GOOGLE_CLIENT_ID=...`, or turn Google off with an empty
+/// value. Android needs `--dart-define=GOOGLE_SERVER_CLIENT_ID=<Web id>`.
 /// Every id used must also be in the server's GOOGLE_CLIENT_IDS.
 abstract final class SocialSignIn {
-  static const googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
+  static const _iosClientId =
+      '236020339900-q76lub834imsf77m5qrb737ce419mj90.apps.googleusercontent.com';
+  static const _webClientId =
+      '236020339900-mfe4i7llegf0mgi7b9jnqan6tp3hhc4a.apps.googleusercontent.com';
+
+  static const _clientIdOverride = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue: '-',
+  );
+
+  static String get googleClientId => _clientIdOverride != '-'
+      ? _clientIdOverride
+      : kIsWeb
+      ? _webClientId
+      : _iOS
+      ? _iosClientId
+      : '';
+
   static const googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
   );

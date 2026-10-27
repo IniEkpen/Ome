@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -180,6 +181,17 @@ void main() {
       ),
     );
     expect(auth.isAuthenticated, isFalse);
+  });
+
+  test('Google and Apple are on by default on iPhone, off elsewhere', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    expect(SocialSignIn.googleClientId, startsWith('236020339900-q76l'));
+    expect(SocialSignIn.googleEnabled, isTrue);
+    expect(SocialSignIn.appleEnabled, isTrue);
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    expect(SocialSignIn.googleEnabled, isFalse); // needs a server client id
+    expect(SocialSignIn.appleEnabled, isFalse);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   test('Apple nonce: random each time, hashed with SHA-256', () {
