@@ -51,7 +51,10 @@ CREATE TABLE IF NOT EXISTS users (
 
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_login_at               TIMESTAMPTZ
+    last_login_at               TIMESTAMPTZ,
+    -- Set when the person deletes their account. The row stays (scrubbed of
+    -- personal details) so other people's payment history still adds up.
+    deleted_at                  TIMESTAMPTZ
 );
 
 -- upgrade
@@ -68,6 +71,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS payouts_enabled BOOLEAN NOT NULL DEFA
 ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 -- Replaced by the card columns above; nothing reads it any more.
 ALTER TABLE users DROP COLUMN IF EXISTS card_info;
 

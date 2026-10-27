@@ -19,6 +19,7 @@ class _ProfilePageState extends State<ProfilePage> {
   /// Null until loaded, and for dev sessions the server didn't issue.
   UserProfile? _profile;
   bool _savingPrivacy = false;
+  bool _deleting = false;
 
   ProfileService get _service => ProfileService(AuthScope.read(context));
 
@@ -47,6 +48,45 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) showMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _savingPrivacy = false);
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+          'This permanently deletes your account, your saved card and your '
+          'group memberships. Groups you own pass to their longest-standing '
+          'member. People you paid still see those payments, from "Deleted '
+          'user". This can\'t be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final auth = AuthScope.read(context);
+    final navigator = Navigator.of(context);
+    setState(() => _deleting = true);
+    try {
+      await auth.deleteAccount();
+      // Signed out now; the login screen replaces the shell.
+      navigator.popUntil((route) => route.isFirst);
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -147,6 +187,12 @@ class _ProfilePageState extends State<ProfilePage> {
               OutlinedButton(
                 onPressed: () => _logout(context),
                 child: const Text('Log Out'),
+              ),
+              const SizedBox(height: AppSpacing.field),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                onPressed: _deleting ? null : _deleteAccount,
+                child: Text(_deleting ? 'Deleting…' : 'Delete Account'),
               ),
             ],
           ),

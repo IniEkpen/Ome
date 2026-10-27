@@ -22,19 +22,21 @@ class Profile {
     // Includes the password hash, for login only.
     async GetProfileWithPassword(username) {
         const result = await this.pool.query(
-            `SELECT ${PUBLIC_COLUMNS}, password FROM users WHERE lower(username) = lower($1)`, [username])
+            `SELECT ${PUBLIC_COLUMNS}, password FROM users WHERE lower(username) = lower($1) AND deleted_at IS NULL`, [username])
         return result.rows[0] || null
     }
 
     async GetProfileById(userId) {
-        const result = await this.pool.query(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`, [userId])
+        const result = await this.pool.query(
+            `SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1 AND deleted_at IS NULL`, [userId])
         return result.rows[0] || null
     }
 
     async GetProfilesByUsernames(usernames) {
         const result = await this.pool.query(
             `SELECT id, username FROM users
-             WHERE lower(username) = ANY(SELECT lower(name) FROM unnest($1::text[]) AS name)`, [usernames])
+             WHERE lower(username) = ANY(SELECT lower(name) FROM unnest($1::text[]) AS name)
+               AND deleted_at IS NULL`, [usernames])
         return result.rows
     }
 
@@ -44,7 +46,7 @@ class Profile {
         const prefix = query.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)
         const result = await this.pool.query(
             `SELECT id, username, first_name, last_name FROM users
-             WHERE lower(username) LIKE $1 || '%' AND id <> $2
+             WHERE lower(username) LIKE $1 || '%' AND id <> $2 AND deleted_at IS NULL
              ORDER BY lower(username) LIMIT $3`, [prefix, excludeUserId, limit])
         return result.rows
     }
@@ -76,6 +78,25 @@ class Profile {
 
     async RecordLogin(userId) {
         await this.pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [userId])
+    }
+
+    // Account deletion: removes everything that identifies the person but
+    // keeps the row, so the other side of each past payment still has it.
+    // Their payments are made private so they drop off the network map.
+    async Scrub(client, userId) {
+        await client.query('UPDATE transactions SET is_private = true WHERE sender_id = $1 OR recipient_id = $1', [userId])
+        await client.query(
+            `UPDATE users SET username = 'deleted_' || id, first_name = NULL, last_name = NULL,
+                email = NULL, phone = NULL, password = NULL, transactions_private = true,
+                stripe_customer_id = NULL, default_payment_method_id = NULL, card_brand = NULL,
+                card_last4 = NULL, card_exp_month = NULL, card_exp_year = NULL,
+                stripe_connect_account_id = NULL, payouts_enabled = false, deleted_at = now()
+             WHERE id = $1`, [userId])
+    }
+
+    async IsActive(userId) {
+        const result = await this.pool.query('SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL', [userId])
+        return result.rowCount > 0
     }
 
     async UpdatePasswordHash(userId, passwordHash) {

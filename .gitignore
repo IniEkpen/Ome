@@ -1,0 +1,5 @@
+# Installed by `npm install` from package-lock.json; never committed.
+node_modules/
+
+# Secrets live in ome_backend/.env (see .env.example).
+.env

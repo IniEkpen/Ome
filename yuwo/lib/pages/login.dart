@@ -69,16 +69,7 @@ class _LoginPageState extends State<LoginPage> {
                 onFieldSubmitted: (_) => _submit(),
                 validator: (v) => Validators.required(v, 'your password'),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => showMessage(
-                    context,
-                    "Password reset isn't available yet.",
-                  ),
-                  child: const Text('Forgot Password'),
-                ),
-              ),
+              const SizedBox(height: AppSpacing.gap),
               LoadingButton(
                 label: 'Login',
                 loading: _loading,
