@@ -3,8 +3,8 @@ const app = require('./app')
 const { isStripeConfigured } = require('./services/stripeClient')
 const { pool } = require('./db')
 
-const server = app.listen(config.port, () => {
-    console.log(`The server is running on port ${config.port}`)
+const server = app.listen(config.port, config.host, () => {
+    console.log(`The server is running on ${config.host}:${server.address().port}`)
     if (!isStripeConfigured()) {
         console.warn('STRIPE_SECRET_KEY is not set: card and payment routes will return 503.')
     }
