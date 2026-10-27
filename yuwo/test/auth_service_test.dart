@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:yuwo/services/api_client.dart';
 import 'package:yuwo/services/auth_service.dart';
+import 'package:yuwo/services/social_sign_in.dart';
 
 /// In-memory stand-in for the Keychain-backed store.
 class _MemoryStore implements SessionStore {
@@ -110,5 +111,85 @@ void main() {
     await auth.deleteAccount();
     expect(auth.isAuthenticated, isFalse);
     expect(store.saved, isNull);
+  });
+
+  test('Google sign-in sends the ID token and saves the session', () async {
+    final store = _MemoryStore();
+    Map<String, dynamic>? sent;
+    final auth = _auth(store, (request) async {
+      expect(request.url.path, '/users/oauth/google');
+      sent = jsonDecode(request.body) as Map<String, dynamic>;
+      return _json({
+        'token': 'g1',
+        'id': 3,
+        'username': 'ada',
+        'isNewUser': true,
+      });
+    });
+    final isNew = await auth.signInWithGoogle('google-id-token');
+    expect(sent, {'idToken': 'google-id-token'});
+    expect(isNew, isTrue);
+    expect(auth.session?.username, 'ada');
+    expect(store.saved?.token, 'g1');
+  });
+
+  test(
+    'Apple sign-in sends token, nonce, code and the one-time name',
+    () async {
+      Map<String, dynamic>? sent;
+      final auth = _auth(_MemoryStore(), (request) async {
+        expect(request.url.path, '/users/oauth/apple');
+        sent = jsonDecode(request.body) as Map<String, dynamic>;
+        return _json({'token': 'a1', 'id': 4, 'username': 'cleo'});
+      });
+      final isNew = await auth.signInWithApple(
+        identityToken: 'apple-jwt',
+        rawNonce: 'raw',
+        authorizationCode: 'code',
+        firstName: 'Cleo',
+        lastName: 'Park',
+      );
+      expect(sent, {
+        'identityToken': 'apple-jwt',
+        'nonce': 'raw',
+        'authorizationCode': 'code',
+        'firstName': 'Cleo',
+        'lastName': 'Park',
+      });
+      expect(isNew, isFalse);
+      expect(auth.isAuthenticated, isTrue);
+    },
+  );
+
+  test('a rejected provider sign-in shows the server message', () async {
+    final auth = _auth(
+      _MemoryStore(),
+      (_) async => _json({
+        'error': "Signing in with Google isn't set up yet.",
+        'code': 'oauth_unavailable',
+      }, 503),
+    );
+    await expectLater(
+      auth.signInWithGoogle('x'),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.message,
+          'message',
+          "Signing in with Google isn't set up yet.",
+        ),
+      ),
+    );
+    expect(auth.isAuthenticated, isFalse);
+  });
+
+  test('Apple nonce: random each time, hashed with SHA-256', () {
+    final a = SocialSignIn.newNonce();
+    expect(a, isNot(SocialSignIn.newNonce()));
+    expect(a.length, greaterThanOrEqualTo(43));
+    // SHA-256 of "abc", hex.
+    expect(
+      SocialSignIn.sha256Of('abc'),
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
   });
 }

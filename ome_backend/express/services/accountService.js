@@ -5,17 +5,18 @@
 // - groups you own pass to the longest-standing member, or are deleted when
 //   nobody else is in them;
 // - your memberships and invites go;
-// - your user row is scrubbed (see Profile.Scrub) and your saved card is
-//   removed from Stripe.
+// - your user row is scrubbed (see Profile.Scrub), your saved card is
+//   removed from Stripe and Sign in with Apple is revoked.
 const { withTransaction } = require('../db')
 const { HttpError } = require('../auth')
 const { profile } = require('../models/Profile')
 const { getStripe, isStripeConfigured } = require('./stripeClient')
+const oauth = require('./oauthService')
 
 async function deleteAccount(userId) {
     const stripeIds = await withTransaction(async (client) => {
         const user = await client.query(
-            `SELECT stripe_customer_id, stripe_connect_account_id FROM users
+            `SELECT stripe_customer_id, stripe_connect_account_id, apple_refresh_token FROM users
              WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [userId])
         if (user.rowCount === 0) throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
 
@@ -58,8 +59,11 @@ async function deleteAccount(userId) {
         return user.rows[0]
     })
 
-    // After the commit, so a Stripe outage can't block deletion. Deleting the
-    // customer also removes their saved cards.
+    // After the commit, so an Apple or Stripe outage can't block deletion.
+    await oauth.revokeApple(stripeIds.apple_refresh_token).catch((error) => {
+        console.error(`Revoking Sign in with Apple for deleted user ${userId} failed:`, error.message)
+    })
+    // Deleting the Stripe customer also removes their saved cards.
     if (isStripeConfigured()) {
         const stripe = getStripe()
         await Promise.all([

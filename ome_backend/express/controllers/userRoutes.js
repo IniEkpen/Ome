@@ -4,6 +4,7 @@ const { HttpError, hashPassword, verifyPassword, issueToken, requireUser } = req
 const { rateLimit } = require('../rateLimit')
 const home = require('../services/homeService')
 const account = require('../services/accountService')
+const oauth = require('../services/oauthService')
 
 const USERNAME = /^[A-Za-z0-9_.]{3,30}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -86,6 +87,37 @@ router.post('/login', authLimit, async (req, res) => {
         UserExists: true,
         card: Profile.CardSummary(user),
     })
+})
+
+// Same shape as /login, plus isNewUser so the app can welcome first-timers.
+function signedIn(res, { user, isNew }) {
+    return res.json({
+        token: issueToken(user),
+        id: user.id,
+        username: user.username,
+        UserExists: true,
+        isNewUser: isNew,
+        card: Profile.CardSummary(user),
+    })
+}
+
+// "Continue with Google": the app sends the Google ID token.
+router.post('/oauth/google', authLimit, async (req, res) => {
+    const identity = await oauth.verifyGoogle(req.body?.idToken)
+    return signedIn(res, await oauth.signIn(identity))
+})
+
+// "Sign in with Apple": the identity token, the nonce the app generated, and
+// on first sign-in the name Apple shares only with the app.
+router.post('/oauth/apple', authLimit, async (req, res) => {
+    const body = req.body || {}
+    const identity = await oauth.verifyApple(body.identityToken, body.nonce)
+    const name = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null)
+    return signedIn(res, await oauth.signIn(identity, {
+        firstName: name(body.firstName),
+        lastName: name(body.lastName),
+        appleRefreshToken: await oauth.exchangeAppleCode(body.authorizationCode),
+    }))
 })
 
 router.get('/me', requireUser, async (req, res) => {

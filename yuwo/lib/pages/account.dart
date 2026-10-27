@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../utils/validators.dart';
 import '../widgets/auth_layout.dart';
 import '../widgets/common.dart';
+import '../widgets/social_sign_in_buttons.dart';
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -165,6 +166,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         ),
       ),
       footer: [
+        // This page sits above the login screen; close it once signed in.
+        SocialSignInButtons(
+          onSignedIn: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+        ),
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).maybePop(),
           child: const Text('Already have an account? Login'),

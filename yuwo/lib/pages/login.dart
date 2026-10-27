@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/validators.dart';
 import '../widgets/auth_layout.dart';
 import '../widgets/common.dart';
+import '../widgets/social_sign_in_buttons.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -80,6 +81,8 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
       footer: [
+        // AuthGate swaps in the app once signed in.
+        const SocialSignInButtons(),
         OutlinedButton(
           onPressed: _loading
               ? null

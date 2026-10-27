@@ -90,7 +90,8 @@ class Profile {
                 email = NULL, phone = NULL, password = NULL, transactions_private = true,
                 stripe_customer_id = NULL, default_payment_method_id = NULL, card_brand = NULL,
                 card_last4 = NULL, card_exp_month = NULL, card_exp_year = NULL,
-                stripe_connect_account_id = NULL, payouts_enabled = false, deleted_at = now()
+                stripe_connect_account_id = NULL, payouts_enabled = false,
+                google_sub = NULL, apple_sub = NULL, apple_refresh_token = NULL, deleted_at = now()
              WHERE id = $1`, [userId])
     }
 
