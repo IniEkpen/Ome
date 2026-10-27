@@ -98,15 +98,7 @@ class HomePage extends StatelessWidget {
     final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
     final body = _body(home, open);
     return Scaffold(
-      appBar: YuwoAppBar(
-        actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: const YuwoAppBar(),
       body: onRefresh == null
           ? body
           : RefreshIndicator(onRefresh: onRefresh!, child: body),

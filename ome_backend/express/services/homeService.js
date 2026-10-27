@@ -57,11 +57,10 @@ async function recentActivity(userId) {
     const { rows } = await pool.query(
         `SELECT * FROM (
             SELECT CASE WHEN t.sender_id = $1 THEN 'you_paid' ELSE 'paid_you' END AS kind,
-                   CASE WHEN t.sender_id = $1 THEN recipient.username ELSE sender.username END AS who,
+                   CASE WHEN other.deleted_at IS NULL THEN other.username ELSE 'Deleted user' END AS who,
                    g.group_name, t.amount_cents, t.created_at AS at
             FROM transactions t
-            JOIN users sender ON sender.id = t.sender_id
-            JOIN users recipient ON recipient.id = t.recipient_id
+            JOIN users other ON other.id = CASE WHEN t.sender_id = $1 THEN t.recipient_id ELSE t.sender_id END
             LEFT JOIN groups g ON g.id = t.group_id
             WHERE t.sender_id = $1 OR t.recipient_id = $1
 

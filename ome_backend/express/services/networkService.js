@@ -42,8 +42,10 @@ async function walk(viewerId, depth, targetId = null) {
 }
 
 async function parties(userIds) {
-    const { rows } = await pool.query('SELECT id, username FROM users WHERE id = ANY($1::int[])', [userIds])
-    return rows.map((u) => ({ id: String(u.id), label: u.username }))
+    const { rows } = await pool.query(
+        `SELECT id, CASE WHEN deleted_at IS NULL THEN username ELSE 'Deleted user' END AS label
+         FROM users WHERE id = ANY($1::int[])`, [userIds])
+    return rows.map((u) => ({ id: String(u.id), label: u.label }))
 }
 
 function toJson(tx, viewerId) {

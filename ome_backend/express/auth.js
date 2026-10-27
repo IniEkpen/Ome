@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const { profile } = require('./models/Profile')
 const config = require('./config')
 
 // Without a configured secret, tokens only last until the server restarts.
@@ -64,10 +65,13 @@ function verifyToken(token) {
 }
 
 // The acting user always comes from the bearer token, never the request body.
-function requireUser(req, res, next) {
+// Tokens of deleted accounts stop working straight away, not when they expire.
+async function requireUser(req, res, next) {
     const header = req.get('Authorization') || ''
     const user = header.startsWith('Bearer ') ? verifyToken(header.slice(7)) : null
-    if (!user) return next(new HttpError(401, 'Please sign in again.', 'unauthenticated'))
+    if (!user || !(await profile.IsActive(user.id))) {
+        throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
+    }
     req.user = user
     return next()
 }

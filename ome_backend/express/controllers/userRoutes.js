@@ -3,6 +3,7 @@ const { profile, Profile } = require('../models/Profile')
 const { HttpError, hashPassword, verifyPassword, issueToken, requireUser } = require('../auth')
 const { rateLimit } = require('../rateLimit')
 const home = require('../services/homeService')
+const account = require('../services/accountService')
 
 const USERNAME = /^[A-Za-z0-9_.]{3,30}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -113,6 +114,12 @@ router.patch('/me', requireUser, async (req, res) => {
     const user = await profile.UpdateProfile(req.user.id, changes)
     if (!user) throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
     return res.json(publicProfile(user))
+})
+
+// Permanently deletes the signed-in account (409 'money_pending' while money is moving).
+router.delete('/me', requireUser, async (req, res) => {
+    await account.deleteAccount(req.user.id)
+    return res.status(204).send()
 })
 
 // Everything the home page shows: open bills and recent activity.

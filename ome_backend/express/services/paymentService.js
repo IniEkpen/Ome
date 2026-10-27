@@ -28,7 +28,9 @@ async function createCardSetupIntent(user) {
     const setupIntent = await getStripe().setupIntents.create({
         customer: customerId,
         usage: 'off_session',
-        payment_method_types: ['card'],
+        // Stripe dropped payment_method_types; which methods show is set in the
+        // Dashboard. No redirects: saved cards are charged later, off-session.
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { user_id: String(user.id) },
     })
     return { setupIntentId: setupIntent.id, clientSecret: setupIntent.client_secret }

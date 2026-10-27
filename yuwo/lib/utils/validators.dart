@@ -4,8 +4,10 @@ abstract final class Validators {
   static final _username = RegExp(r'^[A-Za-z0-9_.]{3,20}$');
   static final _email = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   static final _phone = RegExp(r'^\+?[0-9]{7,15}$');
+  // Any symbol counts, so iOS's suggested strong passwords (which use
+  // hyphens) and password managers' generated ones are accepted.
   static final _password = RegExp(
-    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,64}$',
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,128}$',
   );
 
   static String? required(String? value, String field) =>
@@ -42,6 +44,6 @@ abstract final class Validators {
     if (value == null || value.isEmpty) return 'Please enter a password';
     return _password.hasMatch(value)
         ? null
-        : '8+ characters with upper, lower, number and symbol (@\$!%*?&)';
+        : '8+ characters with upper and lower case, a number and a symbol';
   }
 }
