@@ -82,9 +82,14 @@ test('a provider without client ids is reported as not set up', async () => {
 })
 
 test('usernames are made from the email or name and always valid', () => {
-    assert.equal(oauth.usernameBase({ email: 'ada.lovelace+test@x.io' }), 'ada.lovelacetest')
+    assert.equal(oauth.usernameBase({ email: 'ada.lovelace+test@x.io' }), 'ada.lovelacetes')
     assert.equal(oauth.usernameBase({ firstName: 'Zoë', lastName: "O'Neil" }), 'ZoONeil')
     assert.equal(oauth.usernameBase({ email: 'é@x.io' }), 'user')
     assert.equal(oauth.usernameBase({}), 'user')
-    assert.match(oauth.usernameBase({ email: `${'a'.repeat(60)}@x.io` }), /^[A-Za-z0-9_.]{3,30}$/)
+    // Same rules as signup: starts with a letter, no "..", no trailing ".", not reserved.
+    assert.equal(oauth.usernameBase({ email: '123.bob..smith.@x.io' }), 'bob.smith')
+    assert.equal(oauth.usernameBase({ email: 'deleted_7@x.io' }), 'user')
+    assert.equal(oauth.usernameBase({ email: 'admin@x.io' }), 'user')
+    // Room for a 5-digit suffix when the name is taken: still within 20.
+    assert.equal(oauth.usernameBase({ email: `${'a'.repeat(60)}@x.io` }).length, 15)
 })
