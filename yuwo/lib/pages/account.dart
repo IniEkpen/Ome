@@ -120,7 +120,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               _field(
                 _username,
                 'Username',
-                Validators.username,
+                Validators.newUsername,
                 autofillHints: const [AutofillHints.newUsername],
               ),
               gap,
@@ -144,7 +144,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                 controller: _password,
                 autofillHints: const [AutofillHints.newPassword],
                 textInputAction: TextInputAction.next,
-                validator: Validators.newPassword,
+                validator: (v) => Validators.newPassword(
+                  v,
+                  username: _username.text,
+                  email: _email.text,
+                ),
               ),
               gap,
               PasswordField(

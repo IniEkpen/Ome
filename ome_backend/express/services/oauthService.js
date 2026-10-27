@@ -11,6 +11,7 @@ const { createRemoteJWKSet, jwtVerify, SignJWT, importPKCS8 } = require('jose')
 const config = require('../config')
 const { withTransaction } = require('../db')
 const { HttpError } = require('../auth')
+const { usernameProblem, USERNAME_MAX } = require('../credentials')
 
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com']
 const APPLE_ISSUER = 'https://appleid.apple.com'
@@ -132,13 +133,18 @@ const USER_COLUMNS = `id, username, first_name, last_name, email, phone, transac
     stripe_customer_id, default_payment_method_id, card_brand, card_last4, card_exp_month, card_exp_year,
     stripe_connect_account_id, payouts_enabled, created_at`
 
-// "Ada.Lovelace+test@x.io" -> "Ada.Lovelacetest". Usernames allow letters,
-// numbers, _ and . (3-30 characters).
+// "Ada.Lovelace+test@x.io" -> "Ada.Lovelacetest". Follows the same rules as
+// signup (see credentials.js), leaving room for a 5-digit suffix if taken.
 function usernameBase(identity) {
     const fromEmail = identity.email?.split('@')[0]
     const fromName = [identity.firstName, identity.lastName].filter(Boolean).join('')
-    const base = (fromEmail || fromName || 'user').replace(/[^A-Za-z0-9_.]/g, '').slice(0, 24)
-    return base.length >= 3 ? base : `${base}user`.slice(0, 24)
+    const base = (fromEmail || fromName || '')
+        .replace(/[^A-Za-z0-9_.]/g, '')
+        .replace(/^[^A-Za-z]+/, '') // must start with a letter
+        .replace(/\.{2,}/g, '.')
+        .slice(0, USERNAME_MAX - 5)
+        .replace(/\.+$/, '')
+    return base.length >= 3 && !usernameProblem(base) ? base : 'user'
 }
 
 async function freeUsername(client, base) {

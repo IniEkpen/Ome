@@ -5,8 +5,8 @@ const { rateLimit } = require('../rateLimit')
 const home = require('../services/homeService')
 const account = require('../services/accountService')
 const oauth = require('../services/oauthService')
+const { usernameProblem, passwordProblem } = require('../credentials')
 
-const USERNAME = /^[A-Za-z0-9_.]{3,30}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // 10 tries a minute per IP is plenty for a person and slows password guessing.
@@ -35,14 +35,12 @@ function publicProfile(user) {
 // User signup
 router.post('/signup', authLimit, async (req, res) => {
     const { username, email, phone, password } = req.body || {}
-    if (typeof username !== 'string' || !USERNAME.test(username)) {
-        throw new HttpError(400, 'Choose a username of 3-30 letters, numbers, _ or .', 'invalid_username')
-    }
-    if (typeof password !== 'string' || password.length < 8) {
-        throw new HttpError(400, 'Use a password of at least 8 characters.', 'invalid_password')
-    }
+    const badUsername = usernameProblem(username)
+    if (badUsername) throw new HttpError(400, badUsername, 'invalid_username')
     const cleanEmail = optionalText(email, 255, 'Enter a valid email.', 'invalid_email')
     if (cleanEmail && !EMAIL.test(cleanEmail)) throw new HttpError(400, 'Enter a valid email.', 'invalid_email')
+    const badPassword = passwordProblem(password, { username, email: cleanEmail })
+    if (badPassword) throw new HttpError(400, badPassword, 'invalid_password')
     const fields = {
         username,
         email: cleanEmail,
