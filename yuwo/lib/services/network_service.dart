@@ -27,8 +27,11 @@ class ApiNetworkRepository implements NetworkRepository {
       if (row is Map<String, dynamic>) row,
   ];
 
-  static Party _party(Map<String, dynamic> json) =>
-      Party(id: json['id'] as String, label: json['label'] as String);
+  static Party _party(Map<String, dynamic> json) => Party(
+    id: json['id'] as String,
+    label: json['label'] as String,
+    name: json['name'] is String ? json['name'] as String : null,
+  );
 
   static NetworkPayload _payload(Map<String, dynamic> json) => NetworkPayload(
     parties: _rows(json['parties']).map(_party).toList(),
@@ -40,8 +43,9 @@ class ApiNetworkRepository implements NetworkRepository {
           recipientId: tx['recipientId'] as String,
           amount: (tx['amount'] as num? ?? 0).toDouble(),
           isPrivate: tx['isPrivate'] == true,
-          timestamp: DateTime.tryParse(tx['timestamp'] as String? ?? '')
-              ?.toLocal(),
+          timestamp: DateTime.tryParse(
+            tx['timestamp'] as String? ?? '',
+          )?.toLocal(),
           note: tx['note'] as String?,
         ),
     ],

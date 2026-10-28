@@ -238,9 +238,15 @@ class _PaymentCardState extends State<_PaymentCard> {
               const SizedBox(height: AppSpacing.field),
               // Hosts receive what members pay through Stripe Connect.
               TextButton(
-                onPressed: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const Pay())),
+                onPressed: () async {
+                  await Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const Pay()));
+                  // Onboarding may have just finished; show the new status.
+                  if (mounted) {
+                    setState(() => _status = _payments.cardStatus());
+                  }
+                },
                 child: Text(
                   card.payoutsEnabled
                       ? 'Payouts set up'

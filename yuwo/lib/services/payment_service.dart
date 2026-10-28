@@ -1,16 +1,23 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:http/http.dart' as http;
 
 import 'api_client.dart';
 import 'auth_service.dart';
 
 /// Only the *publishable* key ever ships in the app; the secret key stays on
-/// the server. Pass it at build time:
+/// the server. By default it's fetched from the server (GET /payments/config,
+/// set by STRIPE_PUBLISHABLE_KEY there). A build can also bake one in:
 ///   flutter run --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_...
 abstract final class StripeConfig {
-  static const publishableKey = String.fromEnvironment(
-    'STRIPE_PUBLISHABLE_KEY',
-  );
+  static const _buildKey = String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
+  static String _publishableKey = _buildKey;
+  static Future<void>? _loading;
+
+  static String get publishableKey => _publishableKey;
 
   // PaymentSheet only exists on Android and iOS.
   static bool get isSupported =>
@@ -18,12 +25,41 @@ abstract final class StripeConfig {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  static bool get isConfigured => publishableKey.isNotEmpty && isSupported;
+  static bool get isConfigured => _publishableKey.isNotEmpty && isSupported;
 
   /// Call once from main() after WidgetsFlutterBinding.ensureInitialized().
+  /// Without a build-time key, the server's key loads in the background.
   static Future<void> init() async {
-    if (!isConfigured) return;
-    Stripe.publishableKey = publishableKey;
+    if (!isSupported) return;
+    if (_buildKey.isNotEmpty) return _apply();
+    unawaited(ready());
+  }
+
+  /// Completes once a key is loaded, or the server couldn't provide one.
+  /// Tries the server again if an earlier attempt failed.
+  static Future<void> ready() {
+    if (isConfigured || !isSupported) return Future.value();
+    return _loading ??= _loadFromServer().whenComplete(() => _loading = null);
+  }
+
+  static Future<void> _loadFromServer() async {
+    try {
+      final response = await http
+          .get(ApiConfig.uri('/payments/config'))
+          .timeout(ApiConfig.timeout);
+      final json = jsonDecode(response.body);
+      final key = json is Map<String, dynamic> ? json['publishableKey'] : null;
+      if (response.statusCode == 200 && key is String && key.startsWith('pk_')) {
+        _publishableKey = key;
+        await _apply();
+      }
+    } catch (_) {
+      // Card entry stays unavailable for now; callers show a message.
+    }
+  }
+
+  static Future<void> _apply() async {
+    Stripe.publishableKey = _publishableKey;
     await Stripe.instance.applySettings();
   }
 }
@@ -88,6 +124,7 @@ class PaymentService {
   /// Opens Stripe's card sheet and saves the card as the default for splits.
   /// Returns null if the user closed the sheet without adding a card.
   Future<CardStatus?> addCard() async {
+    await StripeConfig.ready();
     if (!StripeConfig.isConfigured) {
       throw const ApiException(
         "Adding a card isn't available in this build yet.",

@@ -7,18 +7,27 @@ const { getStripe, isStripeConfigured } = require('../services/stripeClient')
 const payments = require('../services/paymentService')
 const splits = require('../services/splitService')
 
-// Stripe calls this directly. It must see the raw body to verify the
-// signature, so app.js mounts it before express.json().
+// Stripe signs each endpoint with its own secret; the platform endpoint and a
+// Connect endpoint may both point here, so any configured secret is accepted.
+function verifiedSnapshotEvent(req) {
+    for (const secret of config.stripe.webhookSecrets) {
+        try {
+            return getStripe().webhooks.constructEvent(req.body, req.get('stripe-signature'), secret)
+        } catch (error) {
+            // Try the next secret.
+        }
+    }
+    return null
+}
+
+// Stripe calls this directly (snapshot events). It must see the raw body to
+// verify the signature, so app.js mounts it before express.json().
 async function webhook(req, res) {
-    if (!isStripeConfigured() || !config.stripe.webhookSecret) {
+    if (!isStripeConfigured() || config.stripe.webhookSecrets.length === 0) {
         return res.status(503).json({ error: 'Payments are not set up yet.' })
     }
-    let event
-    try {
-        event = getStripe().webhooks.constructEvent(req.body, req.get('stripe-signature'), config.stripe.webhookSecret)
-    } catch (error) {
-        return res.status(400).json({ error: 'Invalid signature' })
-    }
+    const event = verifiedSnapshotEvent(req)
+    if (!event) return res.status(400).json({ error: 'Invalid signature' })
     if (!(await payments.beginWebhookEvent(event))) return res.json({ received: true, duplicate: true })
 
     const object = event.data.object
@@ -36,11 +45,18 @@ async function webhook(req, res) {
         case 'payment_intent.requires_action':
             splitId = await payments.handlePaymentFailed(object, 'requires_action')
             break
-        case 'account.updated': {
-            const host = await profile.SetPayoutsEnabled(object.id, Boolean(object.payouts_enabled))
-            if (host && object.payouts_enabled) await payments.releasePendingPayouts(host.id)
+        case 'charge.refunded':
+            splitId = await payments.handleChargeRefunded(object)
             break
-        }
+        case 'charge.dispute.created':
+        case 'charge.dispute.updated':
+        case 'charge.dispute.closed':
+            splitId = await payments.handleDispute(object)
+            break
+        // Sent to a Connect endpoint for connected accounts (v1 view of a v2 account).
+        case 'account.updated':
+            await payments.syncConnectAccount(object.id)
+            break
         default:
             break
     }
@@ -50,6 +66,39 @@ async function webhook(req, res) {
     return res.json({ received: true })
 }
 
+// Thin events from an event destination for v2 accounts, e.g.
+// v2.core.account[configuration.recipient].capability_status_updated.
+// The payload only names the account, so its current state is fetched.
+async function accountsWebhook(req, res) {
+    if (!isStripeConfigured() || !config.stripe.accountsWebhookSecret) {
+        return res.status(503).json({ error: 'Payments are not set up yet.' })
+    }
+    let notification
+    try {
+        notification = getStripe().parseEventNotification(
+            req.body, req.get('stripe-signature'), config.stripe.accountsWebhookSecret)
+    } catch (error) {
+        return res.status(400).json({ error: 'Invalid signature' })
+    }
+    if (!(await payments.beginWebhookEvent(notification))) return res.json({ received: true, duplicate: true })
+    const accountId = notification.related_object?.id
+    if (notification.type.startsWith('v2.core.account') && accountId?.startsWith('acct_')) {
+        await payments.syncConnectAccount(accountId)
+    }
+    await payments.finishWebhookEvent(notification)
+    return res.json({ received: true })
+}
+
+// What the app needs to start Stripe: the publishable key is public by design,
+// so a build doesn't have to bake it in.
+router.get('/config', (req, res) => {
+    return res.json({
+        paymentsEnabled: isStripeConfigured(),
+        publishableKey: config.stripe.publishableKey,
+        currency: config.stripe.currency,
+    })
+})
+
 router.use(requireUser)
 
 async function currentUser(req) {
@@ -58,8 +107,24 @@ async function currentUser(req) {
     return user
 }
 
+// Re-reads a host's payout status from Stripe while it isn't active yet, so the
+// app sees onboarding finish even when the accounts webhook isn't configured.
+async function currentUserWithFreshConnect(req, { always = false } = {}) {
+    const user = await currentUser(req)
+    if (!user.stripe_connect_account_id || !isStripeConfigured()) return user
+    if (user.payouts_enabled && !always) return user
+    try {
+        await payments.syncConnectAccount(user.stripe_connect_account_id)
+    } catch (error) {
+        console.error('Refreshing payout status failed:', error.code || error.message)
+        return user
+    }
+    return currentUser(req)
+}
+
 router.get('/card', async (req, res) => {
-    return res.json({ card: Profile.CardSummary(await currentUser(req)), paymentsEnabled: isStripeConfigured() })
+    const user = await currentUserWithFreshConnect(req)
+    return res.json({ card: Profile.CardSummary(user), paymentsEnabled: isStripeConfigured() })
 })
 
 // Step 1 of adding a card: the app confirms the returned client secret with Stripe.
@@ -79,9 +144,16 @@ router.post('/card/confirm', async (req, res) => {
     return res.json({ card: Profile.CardSummary(await currentUser(req)) })
 })
 
-// Hosts onboard to Stripe Connect so the money people pay them can be paid out.
+// A host's payout account status, refreshed from Stripe.
+router.get('/connect', async (req, res) => {
+    const user = await currentUserWithFreshConnect(req, { always: true })
+    return res.json({ connect: Profile.ConnectSummary(user), paymentsEnabled: isStripeConfigured() })
+})
+
+// Hosts onboard to Stripe Connect inside the app (embedded component) so the
+// money people pay them can be paid out.
 router.post('/connect/account-session', async (req, res) => {
     return res.json(await payments.createConnectAccountSession(await currentUser(req)))
 })
 
-module.exports = { router, webhook }
+module.exports = { router, webhook, accountsWebhook }

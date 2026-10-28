@@ -45,9 +45,16 @@ CREATE TABLE IF NOT EXISTS users (
     card_exp_month              INT CHECK (card_exp_month BETWEEN 1 AND 12),
     card_exp_year               INT,
 
-    -- Stripe Connect account that receives payouts when this user hosts.
+    -- Stripe Connect account (Accounts v2, recipient configuration) that
+    -- receives transfers when this user hosts. The platform carries losses.
     stripe_connect_account_id   TEXT UNIQUE,
+    -- True once the account can receive transfers (stripe_transfers is active).
     payouts_enabled             BOOLEAN NOT NULL DEFAULT false,
+    -- Capability statuses from Stripe: active, pending, restricted, rejected, unsupported.
+    connect_transfers_status    VARCHAR(20),
+    connect_payouts_status      VARCHAR(20),
+    -- Stripe is waiting on the host for more information.
+    connect_requirements_due    BOOLEAN NOT NULL DEFAULT false,
 
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -65,6 +72,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS card_exp_month INT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS card_exp_year INT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_connect_account_id TEXT UNIQUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS payouts_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS connect_transfers_status VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS connect_payouts_status VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS connect_requirements_due BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
@@ -227,9 +237,11 @@ CREATE TABLE IF NOT EXISTS split_participants (
     -- Frozen when a host confirms.
     owed_cents                INT,
     charge_cents              INT,
+    -- 'refunded' and 'disputed' come after 'succeeded' (see paymentService).
     payment_status            VARCHAR(20) NOT NULL DEFAULT 'pending'
                               CHECK (payment_status IN ('pending', 'not_required', 'processing',
-                                                        'succeeded', 'failed', 'requires_action')),
+                                                        'succeeded', 'failed', 'requires_action',
+                                                        'refunded', 'disputed')),
     stripe_payment_intent_id  TEXT UNIQUE,
     -- Stripe's decline code (e.g. 'insufficient_funds') so hosts know why.
     payment_error_code        VARCHAR(64),
@@ -240,6 +252,10 @@ CREATE TABLE IF NOT EXISTS split_participants (
 -- upgrade
 ALTER TABLE split_participants ADD COLUMN IF NOT EXISTS payment_error_code VARCHAR(64);
 ALTER TABLE split_participants ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+ALTER TABLE split_participants DROP CONSTRAINT IF EXISTS split_participants_payment_status_check,
+    ADD CONSTRAINT split_participants_payment_status_check
+        CHECK (payment_status IN ('pending', 'not_required', 'processing', 'succeeded', 'failed',
+                                  'requires_action', 'refunded', 'disputed'));
 
 -- "Bills I'm part of" for the home page.
 CREATE INDEX IF NOT EXISTS split_participants_user ON split_participants (user_id);
@@ -251,16 +267,54 @@ CREATE TABLE IF NOT EXISTS split_payouts (
     host_user_id              INT NOT NULL REFERENCES users(id),
     source_payment_intent_id  TEXT NOT NULL,
     amount_cents              INT NOT NULL CHECK (amount_cents >= 0),
+    -- 'cancelled': the payment was refunded or disputed before it was sent.
+    -- 'reversed': sent, then pulled back from the host (refund or lost dispute).
     status                    VARCHAR(30) NOT NULL DEFAULT 'awaiting_host_onboarding'
-                              CHECK (status IN ('awaiting_host_onboarding', 'paid', 'failed')),
+                              CHECK (status IN ('awaiting_host_onboarding', 'paid', 'failed',
+                                                'cancelled', 'reversed')),
     stripe_transfer_id        TEXT UNIQUE,
+    stripe_transfer_reversal_id TEXT,
+    -- Stripe's error code from the last failed transfer or reversal.
+    last_error_code           VARCHAR(64),
     created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
     paid_at                   TIMESTAMPTZ,
+    reversed_at               TIMESTAMPTZ,
     UNIQUE (source_payment_intent_id, host_user_id)
 );
 
 -- upgrade
 ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS stripe_transfer_reversal_id TEXT;
+ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS last_error_code VARCHAR(64);
+ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMPTZ;
+ALTER TABLE split_payouts DROP CONSTRAINT IF EXISTS split_payouts_status_check,
+    ADD CONSTRAINT split_payouts_status_check
+        CHECK (status IN ('awaiting_host_onboarding', 'paid', 'failed', 'cancelled', 'reversed'));
+
+-- Payouts for one member's payment (refunds and disputes look these up).
+CREATE INDEX IF NOT EXISTS split_payouts_source ON split_payouts (source_payment_intent_id);
+
+
+-- ---------------------------------------------------------------------------
+-- stripe_disputes: chargebacks on member payments. The platform is liable,
+-- so these are for tracking and responding in the Stripe Dashboard.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stripe_disputes (
+    id                        TEXT PRIMARY KEY,          -- dp_...
+    stripe_payment_intent_id  TEXT,
+    split_id                  INT REFERENCES splits(id) ON DELETE SET NULL,
+    payer_user_id             INT REFERENCES users(id) ON DELETE SET NULL,
+    amount_cents              INT NOT NULL,
+    reason                    VARCHAR(64),
+    -- Stripe's dispute status, e.g. needs_response, under_review, won, lost.
+    status                    VARCHAR(32) NOT NULL,
+    evidence_due_by           TIMESTAMPTZ,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS stripe_disputes_open ON stripe_disputes (status)
+    WHERE status NOT IN ('won', 'lost', 'warning_closed');
 
 -- Released when a host finishes Connect onboarding.
 CREATE INDEX IF NOT EXISTS split_payouts_host_status ON split_payouts (host_user_id, status);

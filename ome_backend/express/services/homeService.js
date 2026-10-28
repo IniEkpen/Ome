@@ -5,7 +5,8 @@ const { split: Split } = require('../models/Split')
 
 const BILL_LIMIT = 20
 const ACTIVITY_LIMIT = 20
-const DONE = ['succeeded', 'not_required']
+// Nothing more will be charged for these (refunds and disputes are handled by the platform).
+const DONE = ['succeeded', 'not_required', 'refunded', 'disputed']
 
 // Where a bill is, from this person's point of view.
 function stageFor(snapshot, me) {

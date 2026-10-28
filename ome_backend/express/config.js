@@ -19,9 +19,20 @@ const config = {
     stripe: {
         // sk_test_... / sk_live_... (server only, never shipped to the app)
         secretKey: process.env.STRIPE_SECRET_KEY,
-        // whsec_... from the Stripe dashboard / `stripe listen`
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-        currency: process.env.STRIPE_CURRENCY || 'usd',
+        // pk_test_... / pk_live_... Public by design; the app can fetch it from GET /payments/config.
+        publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+        // whsec_... for the snapshot-event endpoint (POST /payments/webhook). Comma separate
+        // several when both a platform endpoint and a Connect endpoint send there.
+        webhookSecrets: (process.env.STRIPE_WEBHOOK_SECRET || '').split(',').map((s) => s.trim()).filter(Boolean),
+        // whsec_... for the thin-event destination (POST /payments/webhook/accounts)
+        // that reports changes to hosts' v2 connected accounts.
+        accountsWebhookSecret: process.env.STRIPE_ACCOUNTS_WEBHOOK_SECRET || null,
+        // US only, no currency conversion: every charge, transfer and account is USD.
+        currency: 'usd',
+        country: 'us',
+        // The platform carries dispute losses. Set to true to also pull a lost
+        // dispute's amount back from the host(s) it was paid out to.
+        recoverLostDisputesFromHosts: process.env.STRIPE_RECOVER_LOST_DISPUTES_FROM_HOSTS === 'true',
     },
 
     // Comma separated list of origins allowed to call the API from a browser.
