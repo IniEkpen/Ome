@@ -68,6 +68,8 @@ class SplitParticipant {
     'processing' => 'Charging…',
     'failed' => 'Card declined',
     'requires_action' => 'Needs card check',
+    'refunded' => 'Refunded',
+    'disputed' => 'Disputed',
     'not_required' => isHost ? 'Host' : 'Nothing owed',
     _ => 'Not charged yet',
   };

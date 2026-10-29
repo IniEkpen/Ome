@@ -22,8 +22,9 @@ app.use(cors({
     )),
 }))
 
-// Stripe webhook
+// Stripe webhooks need the raw body to verify signatures, so they're registered before express.json().
 app.post('/payments/webhook', express.raw({ type: 'application/json' }), payments.webhook)
+app.post('/payments/webhook/accounts', express.raw({ type: 'application/json' }), payments.accountsWebhook)
 
 app.use(express.json({ limit: '100kb' }))
 

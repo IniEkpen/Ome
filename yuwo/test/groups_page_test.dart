@@ -25,6 +25,20 @@ void main() {
               201,
             );
           }
+          if (request.url.path == '/network/search') {
+            const users = {'ben': 'Ben Ade', 'cleo': 'Cleo Moss'};
+            final q = request.url.queryParameters['q'] ?? '';
+            return http.Response(
+              jsonEncode({
+                'users': [
+                  for (final e in users.entries)
+                    if (e.key.startsWith(q))
+                      {'id': e.key, 'label': e.key, 'name': e.value},
+                ],
+              }),
+              200,
+            );
+          }
           return http.Response('[]', 200);
         }),
       ),
@@ -58,7 +72,19 @@ void main() {
     expect(find.text('Create a Group'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Dinner');
-    await tester.enterText(find.byType(TextFormField).at(1), 'ben, cleo');
+
+    // Members are picked from username search results.
+    final search = find.widgetWithText(TextField, 'Add members by username');
+    for (final (query, name) in [('be', 'Ben Ade'), ('cl', 'Cleo Moss')]) {
+      await tester.enterText(search, query);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name));
+      await tester.pumpAndSettle();
+    }
+    expect(find.widgetWithText(InputChip, 'ben'), findsOneWidget);
+    expect(find.widgetWithText(InputChip, 'cleo'), findsOneWidget);
+
     await tester.tap(find.widgetWithText(ElevatedButton, 'Create Group'));
     await tester.pumpAndSettle();
 

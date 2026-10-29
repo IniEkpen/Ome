@@ -2,6 +2,7 @@
 // change the split mode, waive amounts, confirm, cancel or retry charges.
 // Every change is broadcast so all open payment popups stay in sync.
 const config = require('../config')
+const { pool } = require('../db')
 const { HttpError } = require('../auth')
 const { group: Group } = require('../models/Group')
 const { split: Split, Split: SplitModel } = require('../models/Split')
@@ -97,6 +98,7 @@ async function startSplit(user, groupId, body) {
         splitId = await Split.CreateSplit({
             groupId,
             createdBy: user.id,
+            // Always USD for now; there is no currency conversion anywhere.
             currency: config.stripe.currency,
             hostIds,
             memberIds,
@@ -188,7 +190,22 @@ async function retryCharges(user, splitId) {
     return { split: await broadcast(splitId), paymentsSent: result.charged }
 }
 
+// A host gives a member back what they paid. The host's payout is pulled back
+// from their Stripe balance first (see paymentService.refundPayment).
+async function refundParticipant(user, splitId, targetUserId) {
+    const snapshot = await Split.Snapshot(splitId)
+    if (!snapshot) throw new HttpError(404, 'Bill not found.', 'not_found')
+    const participant = await participantRow(pool, splitId, user.id)
+    if (!participant.is_host) throw new HttpError(403, 'Only a host can do that.', 'host_only')
+    if (!['confirmed', 'settled'].includes(snapshot.status)) {
+        throw new HttpError(409, 'Nothing has been paid on this bill.', 'nothing_to_refund')
+    }
+    await payments.refundPayment(splitId, targetUserId)
+    return broadcast(splitId)
+}
+
 module.exports = {
+    refundParticipant,
     startSplit,
     getActiveSplit,
     getSplit,

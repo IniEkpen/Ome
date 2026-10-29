@@ -214,6 +214,7 @@ class Split {
     }
 
     // `errorCode` is Stripe's decline code; it's cleared once a charge succeeds.
+    // Refunded and disputed payments are only changed by paymentService directly.
     async SetPaymentStatus(splitId, userId, status, paymentIntentId, errorCode) {
         await this.pool.query(
             `UPDATE split_participants
@@ -222,7 +223,7 @@ class Split {
                  payment_error_code = CASE WHEN $3::varchar = 'succeeded' THEN NULL
                                            ELSE COALESCE($5, payment_error_code) END,
                  paid_at = CASE WHEN $3::varchar = 'succeeded' THEN COALESCE(paid_at, now()) ELSE paid_at END
-             WHERE split_id = $1 AND user_id = $2`,
+             WHERE split_id = $1 AND user_id = $2 AND payment_status NOT IN ('refunded', 'disputed')`,
             [splitId, userId, status, paymentIntentId || null, errorCode || null])
     }
 

@@ -6,10 +6,13 @@ import '../groups/groupstate.dart';
 import '../groups/joinedgroups.dart';
 import '../services/auth_service.dart';
 import '../services/group_service.dart';
+import '../services/network_service.dart';
 import '../theme/app_theme.dart';
+import '../transactiongraph.dart';
 import '../utils/validators.dart';
 import '../widgets/card_gate.dart';
 import '../widgets/common.dart';
+import '../widgets/username_search_field.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
@@ -112,31 +115,35 @@ class _CreateGroupSheet extends StatefulWidget {
 class _CreateGroupSheetState extends State<_CreateGroupSheet> {
   final _formKey = GlobalKey<FormState>();
   final _groupName = TextEditingController();
-  final _members = TextEditingController();
+  // Members can only come from search results, so they're real accounts.
+  final _members = <Party>[];
+  late final ApiNetworkRepository _network;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _network = ApiNetworkRepository(AuthScope.read(context));
+  }
 
   @override
   void dispose() {
     _groupName.dispose();
-    _members.dispose();
     super.dispose();
   }
 
-  List<String> get _memberList => _members.text
-      .split(',')
-      .map((m) => m.trim())
-      .where((m) => m.isNotEmpty)
-      .toSet()
-      .toList();
+  List<String> get _memberList => [for (final m in _members) m.label];
 
-  String? _validateMembers(String? _) {
-    for (final member in _memberList) {
-      if (Validators.username(member) != null) {
-        return '"$member" is not a valid username';
-      }
-    }
-    return null;
+  Set<String> get _memberKeys => {
+    for (final m in _members) m.label.toLowerCase(),
+  };
+
+  void _addMember(Party user) {
+    if (_memberKeys.contains(user.label.toLowerCase())) return;
+    setState(() => _members.add(user));
   }
+
+  void _removeMember(Party user) => setState(() => _members.remove(user));
 
   Future<void> _submit() async {
     if (_loading || !_formKey.currentState!.validate()) return;
@@ -188,16 +195,27 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
               validator: Validators.name,
             ),
             const SizedBox(height: AppSpacing.field),
-            TextFormField(
-              controller: _members,
-              autocorrect: false,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                hintText: 'Members (usernames, comma separated)',
-              ),
-              validator: _validateMembers,
+            UsernameSearchField(
+              hintText: 'Add members by username',
+              search: _network.searchUsers,
+              excluded: _memberKeys,
+              onSelected: _addMember,
             ),
+            if (_members.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.field),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final member in _members)
+                    InputChip(
+                      label: Text(member.label),
+                      tooltip: member.name,
+                      onDeleted: () => _removeMember(member),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppSpacing.gap),
             LoadingButton(
               label: 'Create Group',

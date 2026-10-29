@@ -1,13 +1,11 @@
 const config = require('./config')
 const app = require('./app')
-const { isStripeConfigured } = require('./services/stripeClient')
+const { describeStripeSetup } = require('./services/stripeClient')
 const { pool } = require('./db')
 
 const server = app.listen(config.port, config.host, () => {
     console.log(`The server is running on ${config.host}:${server.address().port}`)
-    if (!isStripeConfigured()) {
-        console.warn('STRIPE_SECRET_KEY is not set: card and payment routes will return 503.')
-    }
+    for (const note of describeStripeSetup()) console.warn(note)
 })
 
 // Hosts send SIGTERM on deploy: stop taking requests, then close the pool.
