@@ -26,7 +26,7 @@ class _Payment extends State<Pay> {
 
   }
 Future<void> setupStripe(BuildContext context) async{
-  const url = 'https://ome-o9wx.onrender.com/create/stripe';
+  const url = 'https://yuwo.onrender.com/create/stripe';
   String userId = "12345";
   final uri = Uri.parse('$url/$userId');
   try{
