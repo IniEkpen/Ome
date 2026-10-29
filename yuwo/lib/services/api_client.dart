@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 ///   flutter run --dart-define=API_BASE_URL=https://staging.example.com
 abstract final class ApiConfig {
   static const _override = String.fromEnvironment('API_BASE_URL');
-  static const _deployed = 'https://ome-o9wx.onrender.com';
+  static const _deployed = 'https://yuwo.onrender.com';
   static const _local = 'http://localhost:3000';
 
   static String get baseUrl => _override.isNotEmpty
