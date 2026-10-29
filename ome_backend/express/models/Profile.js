@@ -3,7 +3,8 @@ const { pool } = require('../db')
 const PUBLIC_COLUMNS = `id, username, first_name, last_name, email, phone, transactions_private,
     stripe_customer_id, default_payment_method_id,
     card_brand, card_last4, card_exp_month, card_exp_year,
-    stripe_connect_account_id, payouts_enabled, created_at`
+    stripe_connect_account_id, payouts_enabled, connect_transfers_status, connect_payouts_status,
+    connect_requirements_due, created_at`
 
 // Fields a user may change about themselves, mapped to their columns.
 const EDITABLE = {
@@ -40,14 +41,24 @@ class Profile {
         return result.rows
     }
 
-    // Prefix match for "find a person" on the network map.
+    // Username search for pickers and the network map. Matches any username that
+    // contains the typed letters in order, ranked exact > prefix > substring > in-order.
     async SearchByUsername(query, excludeUserId, limit = 10) {
         // '_' is allowed in usernames but is a LIKE wildcard, so escape it.
-        const prefix = query.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)
+        const escape = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`)
+        const q = query.toLowerCase()
+        const inOrder = `%${[...q].map(escape).join('%')}%`
         const result = await this.pool.query(
             `SELECT id, username, first_name, last_name FROM users
-             WHERE lower(username) LIKE $1 || '%' AND id <> $2 AND deleted_at IS NULL
-             ORDER BY lower(username) LIMIT $3`, [prefix, excludeUserId, limit])
+             WHERE lower(username) LIKE $2 AND id <> $3 AND deleted_at IS NULL
+             ORDER BY CASE
+                        WHEN lower(username) = $1 THEN 0
+                        WHEN lower(username) LIKE $4 || '%' THEN 1
+                        WHEN lower(username) LIKE '%' || $4 || '%' THEN 2
+                        ELSE 3
+                      END,
+                      length(username), lower(username)
+             LIMIT $5`, [q, inOrder, excludeUserId, escape(q), limit])
         return result.rows
     }
 
@@ -124,6 +135,17 @@ class Profile {
         }
     }
 
+    // What a host sees about their payout account.
+    static ConnectSummary(user) {
+        return {
+            hasAccount: Boolean(user?.stripe_connect_account_id),
+            payoutsEnabled: Boolean(user?.payouts_enabled),
+            transfersStatus: user?.connect_transfers_status || null,
+            bankPayoutsStatus: user?.connect_payouts_status || null,
+            requirementsDue: Boolean(user?.connect_requirements_due),
+        }
+    }
+
     async SetStripeCustomer(userId, stripeCustomerId) {
         await this.pool.query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [stripeCustomerId, userId])
     }
@@ -141,11 +163,17 @@ class Profile {
         await this.pool.query('UPDATE users SET stripe_connect_account_id = $1 WHERE id = $2', [accountId, userId])
     }
 
-    async SetPayoutsEnabled(accountId, enabled) {
+    // Returns the host and whether they just became able to receive transfers.
+    async SyncConnectStatus(accountId, { transfersStatus, payoutsStatus, requirementsDue }) {
         const result = await this.pool.query(
-            'UPDATE users SET payouts_enabled = $1 WHERE stripe_connect_account_id = $2 RETURNING id',
-            [enabled, accountId])
-        return result.rows[0] || null
+            `UPDATE users u SET payouts_enabled = COALESCE($2::varchar = 'active', false), connect_transfers_status = $2::varchar,
+                connect_payouts_status = $3, connect_requirements_due = $4
+             FROM (SELECT id, payouts_enabled AS was_enabled FROM users WHERE stripe_connect_account_id = $1) old
+             WHERE u.id = old.id
+             RETURNING u.id, u.payouts_enabled, old.was_enabled`,
+            [accountId, transfersStatus, payoutsStatus, requirementsDue])
+        const row = result.rows[0]
+        return row ? { id: row.id, payoutsEnabled: row.payouts_enabled, newlyEnabled: row.payouts_enabled && !row.was_enabled } : null
     }
 }
 

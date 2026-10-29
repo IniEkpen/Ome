@@ -23,7 +23,13 @@ router.get('/search', async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
     if (q.length === 0 || q.length > 30) return res.json({ users: [] })
     const users = await profile.SearchByUsername(q, req.user.id)
-    return res.json({ users: users.map((u) => ({ id: String(u.id), label: u.username })) })
+    return res.json({
+        users: users.map((u) => ({
+            id: String(u.id),
+            label: u.username,
+            name: [u.first_name, u.last_name].filter(Boolean).join(' ') || null,
+        })),
+    })
 })
 
 // How you're connected to someone, through public payments only.

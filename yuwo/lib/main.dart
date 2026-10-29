@@ -10,7 +10,8 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // No-op unless built with --dart-define=STRIPE_PUBLISHABLE_KEY=pk_...
+  // Uses --dart-define=STRIPE_PUBLISHABLE_KEY=pk_... if given, otherwise
+  // loads the key from the server in the background.
   await StripeConfig.init();
 
   // The full app (sign-in, groups, bill splitting) is the default. To open

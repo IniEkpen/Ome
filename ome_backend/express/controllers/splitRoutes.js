@@ -44,4 +44,9 @@ router.post('/:splitId/retry-charges', async (req, res) => {
     return res.json(await splits.retryCharges(req.user, idParam(req, 'splitId')))
 })
 
+router.post('/:splitId/participants/:userId/refund', async (req, res) => {
+    const split = await splits.refundParticipant(req.user, idParam(req, 'splitId'), idParam(req, 'userId'))
+    return res.json({ split })
+})
+
 module.exports = router
