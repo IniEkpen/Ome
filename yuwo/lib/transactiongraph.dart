@@ -7,6 +7,7 @@ class Party {
     required this.id,
     required this.label,
     this.imageAsset,
+    this.imageUrl,
     this.description,
     this.name,
   });
@@ -14,10 +15,27 @@ class Party {
   final String id;
   final String label;
   final String? imageAsset;
+  // Profile picture from the server; preferred over imageAsset.
+  final String? imageUrl;
   final String? description;
 
   /// Full name, when the server sends one (e.g. /network/search results).
   final String? name;
+
+  String? get image => imageUrl ?? imageAsset;
+
+  // "Ada Lovelace" -> "AL", "ben" -> "BE"; shown when there's no picture.
+  // Uses the full name when there is one, otherwise the username.
+  String get initials {
+    final words = (name ?? label).trim().split(RegExp(r'[\s._-]+'))
+      ..removeWhere((w) => w.isEmpty);
+    if (words.isEmpty) return '?';
+    if (words.length == 1) {
+      final w = words.first;
+      return w.substring(0, w.length < 2 ? w.length : 2).toUpperCase();
+    }
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
 }
 
 class TransactionRecord {
@@ -210,13 +228,18 @@ class TransactionGraphBuilder {
           'id': id,
           'label': party.label,
           'description': party.description ?? '',
-          'image': party.imageAsset ?? 'images/profile.png',
+          if (party.image != null) 'image': party.image!,
+          'initials': party.initials,
           'color': id == viewerId
               ? const Color(0xFF477ED5)
               : const Color(0xFF52A98D),
           'highlighted': highlightedPath.contains(id),
         },
       );
+
+      // Nodes stay where the layout puts them, so none can be dragged
+      // out of the map; pinch and pan move the whole map instead.
+      node.canDrag = false;
 
       graph.addNode(node);
       nodes[id] = node;
