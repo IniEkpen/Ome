@@ -18,13 +18,19 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   final diameter = nodeDiameterFor(nodes.length);
 
   // center-to-center minimum for nodes
-  final nodeSpacing = diameter * 2.2;
+  final nodeSpacing = diameter * 2.0;
 
-   // gap a line must keep from a node 
-  final edgeClearance = diameter / 2 + 24;
+   // gap a line must keep from a node
+  final edgeClearance = diameter / 2 + 14;
 
   final width = canvasSize.width.isFinite ? canvasSize.width : 800.0;
   final height = canvasSize.height.isFinite ? canvasSize.height : 600.0;
+
+  // Space to keep between a node's center and the canvas edge: its radius
+  // plus room for the ring's glow, so nothing is drawn past the box.
+  final margin = diameter / 2 + diameter * 0.3 + 6;
+  double clampX(double x) => x.clamp(margin, math.max(width - margin, margin));
+  double clampY(double y) => y.clamp(margin, math.max(height - margin, margin));
 
   // fixed seed so I made it so layout is stable across rebuilds
   final rng = math.Random(7); 
@@ -32,7 +38,7 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   // Seed on a circle so the simulation starts spread out rather than piled
   final positions = <gv.GraphId, Offset>{};
   final center = Offset(width / 2, height / 2);
-  final seedRadius = math.max(math.min(width, height) / 2 - diameter, diameter);
+  final seedRadius = math.max(math.min(width, height) / 2 - margin, diameter);
   for (var i = 0; i < nodes.length; i++) {
     final angle = (2 * math.pi * i) / nodes.length;
     positions[nodes[i].id] = center +
@@ -106,17 +112,45 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
 
     for (final node in nodes) {
       final id = node.id;
-      var next = positions[id]! + forces[id]!;
-      next = Offset(
-        next.dx.clamp(diameter, math.max(width - diameter, diameter)),
-        next.dy.clamp(diameter, math.max(height - diameter, diameter)),
-      );
-      positions[id] = next;
+      final next = positions[id]! + forces[id]!;
+      positions[id] = Offset(clampX(next.dx), clampY(next.dy));
     }
   }
 
+  // Center the finished layout in the canvas, shrinking it if it is still
+  // wider or taller than the space inside the margins.
+  var minX = double.infinity, minY = double.infinity;
+  var maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+  for (final p in positions.values) {
+    minX = math.min(minX, p.dx);
+    maxX = math.max(maxX, p.dx);
+    minY = math.min(minY, p.dy);
+    maxY = math.max(maxY, p.dy);
+  }
+  final spanX = maxX - minX;
+  final spanY = maxY - minY;
+  final fit = math.min(
+    1.0,
+    math.min(
+      spanX > 0 ? (width - 2 * margin) / spanX : 1.0,
+      spanY > 0 ? (height - 2 * margin) / spanY : 1.0,
+    ),
+  );
+  final layoutCenter = Offset((minX + maxX) / 2, (minY + maxY) / 2);
+
+  // plough places a node by its top-left corner, so convert from centers.
+  final half = Offset(diameter / 2, diameter / 2);
+  final topLeft = {
+    for (final e in positions.entries)
+      e.key: Offset(
+            clampX(center.dx + (e.value.dx - layoutCenter.dx) * fit),
+            clampY(center.dy + (e.value.dy - layoutCenter.dy) * fit),
+          ) -
+          half,
+  };
+
   return gv.GraphManualLayoutStrategy(
-    nodePositions: gv.GraphNodeLayoutPosition.fromMap(positions),
-    origin: gv.GraphLayoutPositionOrigin.alignCenter,
+    nodePositions: gv.GraphNodeLayoutPosition.fromMap(topLeft),
+    origin: gv.GraphLayoutPositionOrigin.topLeft,
   );
 }

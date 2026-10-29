@@ -31,6 +31,7 @@ class ApiNetworkRepository implements NetworkRepository {
     id: json['id'] as String,
     label: json['label'] as String,
     name: json['name'] is String ? json['name'] as String : null,
+    imageUrl: json['imageUrl'] is String ? json['imageUrl'] as String : null,
   );
 
   static NetworkPayload _payload(Map<String, dynamic> json) => NetworkPayload(

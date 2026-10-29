@@ -22,10 +22,11 @@ class FakeNetworkRepository implements NetworkRepository {
     Party(id: 'me', label: 'you', imageAsset: 'images/profile.png'),
     Party(id: 'ada', label: 'ada', imageAsset: 'images/profile2.png'),
     Party(id: 'ben', label: 'ben', imageAsset: 'images/profile3.png'),
-    Party(id: 'cleo', label: 'cleo', imageAsset: 'images/profile2.png'),
-    Party(id: 'dev', label: 'dev', imageAsset: 'images/profile3.png'),
-    Party(id: 'eli', label: 'eli', imageAsset: 'images/profile.png'),
-    Party(id: 'fay', label: 'fay', imageAsset: 'images/profile2.png'),
+    // No picture: these show initials instead.
+    Party(id: 'cleo', label: 'cleo m'),
+    Party(id: 'dev', label: 'dev'),
+    Party(id: 'eli', label: 'eli k'),
+    Party(id: 'fay', label: 'fay'),
   ];
 
   // (id, sender, recipient, amount, private, layer it first appears in)

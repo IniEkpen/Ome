@@ -57,8 +57,8 @@ gv.GraphLayoutStrategy adaptiveLayoutFor(int nodeCount) {
 /// Node diameter shrinks a bit as the graph gets busier, so dozens of nodes
 /// don't turn into an overlapping wall of avatars.
 double nodeDiameterFor(int nodeCount) {
-  if (nodeCount <= 6) return 100;
-  if (nodeCount <= 15) return 76;
-  if (nodeCount <= 30) return 56;
-  return 40;
+  if (nodeCount <= 6) return 56;
+  if (nodeCount <= 15) return 46;
+  if (nodeCount <= 30) return 38;
+  return 30;
 }

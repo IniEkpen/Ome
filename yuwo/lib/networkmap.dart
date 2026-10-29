@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+
 import 'package:plough/plough.dart' as gv;
 import 'custom_behaviour.dart';
 import 'edgechecker.dart';
@@ -241,16 +241,9 @@ class _NetworkState extends State<Network>
         busy = false;
       });
 
-      //Zoom in animation for path length
-      final targetScale = path.length > 4
-          ? 0.55
-          : path.length > 2
-              ? 0.75
-              : 1.0;
-
-      _animateCamera(
-        Matrix4.diagonal3Values(targetScale, targetScale, 1),
-      );
+      // The layout always fits every node inside the map, so showing the
+      // whole path just means easing back to the un-zoomed view.
+      _animateCamera(Matrix4.identity());
     } catch (_) {
       if (mounted && version == requestVersion) {
         setState(() {
@@ -285,6 +278,17 @@ class _NetworkState extends State<Network>
     super.dispose();
   }
 
+
+  void _resetView() {
+    setState(() {
+      path = [];
+      extraIds = {};
+      message = null;
+    });
+
+    _animateCamera(Matrix4.identity());
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = builder.visibleGraph(
@@ -297,38 +301,55 @@ class _NetworkState extends State<Network>
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Yuwo', style: AppText.brand),
-              const SizedBox(height: AppSpacing.field),
-              Text('Network', style: AppText.pageTitle),
-              Text(
-                'Who you are connected to through transactions',
-                style: AppText.caption,
-              ),
-              const SizedBox(height: AppSpacing.gap),
-
-              // Layer selection and privacy toggle.
-              AppCard(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  alignment: WrapAlignment.spaceBetween,
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 6,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Layer', style: AppText.sectionTitle),
-                        const SizedBox(width: 4),
+                        Text(
+                          'Network',
+                          style: AppText.pageTitle.copyWith(fontSize: 22),
+                        ),
+                        Text(
+                          'Who you are connected to through transactions',
+                          style: AppText.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                  _RoundButton(
+                    icon: Icons.center_focus_strong,
+                    tooltip: 'Reset view',
+                    onTap: _resetView,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.field),
+
+              // Layer selection and privacy toggle, on one line.
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                      boxShadow: AppShadows.card,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('Layer', style: AppText.caption.copyWith(
+                            color: AppColors.hint,
+                          )),
+                        ),
                         for (var i = 1; i <= 4; i++)
                           _LayerChip(
                             layer: i,
@@ -345,45 +366,29 @@ class _NetworkState extends State<Network>
                           ),
                       ],
                     ),
-
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Show my private transactions',
-                          style: AppText.sectionTitle,
-                        ),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: showMyPrivate,
-                          onChanged: _togglePrivate,
-                        ),
-                      ],
-                    ),
-
-                    TextButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          path = [];
-                          extraIds = {};
-                          message = null;
-                        });
-
-                        _animateCamera(Matrix4.identity());
-                      },
-                      icon: const Icon(Icons.center_focus_strong, size: 18),
-                      label: const Text('Reset view'),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Spacer(),
+                  _PrivateToggle(
+                    value: showMyPrivate,
+                    onChanged: _togglePrivate,
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.field),
 
               // Username search.
               TextField(
                 controller: searchController,
+                style: AppText.body,
+                textAlignVertical: TextAlignVertical.center,
                 decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  prefixIcon: Icon(Icons.search, size: 20),
+                  prefixIconConstraints: BoxConstraints(minWidth: 40),
                   hintText: 'Search username',
                   fillColor: AppColors.surface,
                 ),
@@ -392,30 +397,35 @@ class _NetworkState extends State<Network>
 
               if (suggestions.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 6),
                   child: AppCard(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     radius: AppRadius.control,
-                    child: SizedBox(
-                      height: 150,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 150),
                       child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
                         itemCount: suggestions.length,
                         separatorBuilder: (context, i) => const Divider(
                           height: 1,
-                          indent: 16,
-                          endIndent: 16,
+                          indent: 52,
+                          endIndent: 12,
                           color: AppColors.divider,
                         ),
                         itemBuilder: (context, i) {
                           final party = suggestions[i];
                           return ListTile(
                             dense: true,
-                            leading: CircleAvatar(
-                              radius: 16,
-                              backgroundImage: AssetImage(
-                                party.imageAsset ?? 'images/profile.png',
-                              ),
+                            visualDensity: VisualDensity.compact,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
+                            leading: NetworkAvatar(
+                              diameter: 30,
+                              image: party.image,
+                              initials: party.initials,
+                              ringColor: AppColors.contact,
                             ),
                             title: Text(
                               party.label,
@@ -423,7 +433,7 @@ class _NetworkState extends State<Network>
                             ),
                             trailing: const Icon(
                               Icons.north_east,
-                              size: 16,
+                              size: 14,
                               color: AppColors.hint,
                             ),
                             onTap: () {
@@ -440,18 +450,18 @@ class _NetworkState extends State<Network>
 
               if (message != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 6),
                   child: Row(
                     children: [
                       const Icon(
                         Icons.info_outline,
-                        size: 16,
+                        size: 14,
                         color: AppColors.error,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         message!,
-                        style: AppText.sectionTitle.copyWith(
+                        style: AppText.caption.copyWith(
                           color: AppColors.error,
                         ),
                       ),
@@ -461,7 +471,7 @@ class _NetworkState extends State<Network>
 
               if (path.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.field),
+                  padding: const EdgeInsets.only(top: 8),
                   child: _PathTrail(
                     labels: [
                       for (final id in path) builder.party(id)?.label ?? id,
@@ -473,39 +483,87 @@ class _NetworkState extends State<Network>
 
               // Zoomable transaction graph.
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  child: ColoredBox(
-                    color: AppColors.surface,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: InteractiveViewer(
-                            transformationController: camera,
-                            minScale: 0.2,
-                            maxScale: 4,
-                            constrained: true,
-                            child: Graph(graph: visible),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    boxShadow: AppShadows.card,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    child: ColoredBox(
+                      color: AppColors.surface,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                const Positioned.fill(child: _DotGrid()),
+                                // minScale 1 keeps the map from shrinking
+                                // into a corner of the box; with no
+                                // boundary margin it can't be panned
+                                // past its edges either.
+                                Positioned.fill(
+                                  child: InteractiveViewer(
+                                    transformationController: camera,
+                                    minScale: 1,
+                                    maxScale: 3,
+                                    constrained: true,
+                                    child: Graph(graph: visible),
+                                  ),
+                                ),
+                                if (busy)
+                                  const Positioned(
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    child: LinearProgressIndicator(
+                                      minHeight: 2,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                        if (busy)
-                          const Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: LinearProgressIndicator(minHeight: 3),
-                          ),
-                        const Positioned(
-                          left: 16,
-                          bottom: 16,
-                          child: _Legend(),
-                        ),
-                      ],
+                          const _Legend(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.surface,
+        shape: const CircleBorder(),
+        elevation: 0,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, size: 18, color: AppColors.textPrimary),
           ),
         ),
       ),
@@ -531,11 +589,11 @@ class _LayerChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.tile),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.textPrimary : AppColors.background,
+          color: selected ? AppColors.textPrimary : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.tile),
         ),
         child: Text(
@@ -543,6 +601,45 @@ class _LayerChip extends StatelessWidget {
           style: AppText.sectionTitle.copyWith(
             color: selected ? AppColors.surface : AppColors.textPrimary,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Pill that switches the viewer's private transactions on and off.
+class _PrivateToggle extends StatelessWidget {
+  const _PrivateToggle({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = value ? AppColors.surface : AppColors.textPrimary;
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(AppRadius.control),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: value ? AppColors.private : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          boxShadow: AppShadows.card,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              value ? Icons.lock_open_rounded : Icons.lock_rounded,
+              size: 15,
+              color: fg,
+            ),
+            const SizedBox(width: 6),
+            Text('Private', style: AppText.sectionTitle.copyWith(color: fg)),
+          ],
         ),
       ),
     );
@@ -557,43 +654,63 @@ class _PathTrail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      runSpacing: 4,
       children: [
-        Text('Public path', style: AppText.caption),
-        const SizedBox(height: 6),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (var i = 0; i < labels.length; i++) ...[
-              if (i > 0)
-                const Icon(
-                  Icons.arrow_forward,
-                  size: 14,
-                  color: AppColors.path,
-                ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.path.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadius.control),
-                ),
-                child: Text(
-                  labels[i],
-                  style: AppText.sectionTitle.copyWith(color: AppColors.path),
-                ),
-              ),
-            ],
-          ],
-        ),
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0)
+            const Icon(
+              Icons.arrow_forward,
+              size: 12,
+              color: AppColors.path,
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 3,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.path.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.control),
+            ),
+            child: Text(
+              labels[i],
+              style: AppText.caption.copyWith(color: AppColors.path),
+            ),
+          ),
+        ],
       ],
     );
   }
+}
+
+// Faint dot pattern behind the graph so the map reads as a canvas.
+class _DotGrid extends StatelessWidget {
+  const _DotGrid();
+
+  @override
+  Widget build(BuildContext context) =>
+      const CustomPaint(painter: _DotGridPainter());
+}
+
+class _DotGridPainter extends CustomPainter {
+  const _DotGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0x14000000);
+    const gap = 18.0;
+    for (var y = gap / 2; y < size.height; y += gap) {
+      for (var x = gap / 2; x < size.width; x += gap) {
+        canvas.drawCircle(Offset(x, y), 0.9, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotGridPainter oldDelegate) => false;
 }
 
 class _Legend extends StatelessWidget {
@@ -605,25 +722,26 @@ class _Legend extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         Text(label, style: AppText.caption.copyWith(color: AppColors.hint)),
       ],
     );
 
+    // Footer strip under the map, so the legend never covers a node.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.background.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        boxShadow: AppShadows.card,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 4,
+        alignment: WrapAlignment.center,
+        spacing: 14,
+        runSpacing: 2,
         children: [
           item(AppColors.viewer, 'You'),
           item(AppColors.contact, 'Contacts'),
