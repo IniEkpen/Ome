@@ -403,7 +403,7 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
                               diameter: 30,
                               image: party.image,
                               initials: party.initials,
-                              ringColor: AppColors.contact,
+                              ringColor: MapColors.node,
                             ),
                             title: Text(
                               party.label,
@@ -462,13 +462,7 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppRadius.card),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+                    boxShadow: AppShadows.card,
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.card),
@@ -479,7 +473,6 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
                           Expanded(
                             child: Stack(
                               children: [
-                                const Positioned.fill(child: _Glow()),
                                 // minScale 1 keeps the map from shrinking
                                 // into a corner of the box; with no
                                 // boundary margin it can't be panned
@@ -500,7 +493,7 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
                                     right: 0,
                                     child: LinearProgressIndicator(
                                       minHeight: 2,
-                                      color: MapColors.link,
+                                      color: MapColors.node,
                                       backgroundColor: Colors.transparent,
                                     ),
                                   ),
@@ -645,23 +638,17 @@ class _PathTrail extends StatelessWidget {
       children: [
         for (var i = 0; i < labels.length; i++) ...[
           if (i > 0)
-            const Icon(Icons.arrow_forward, size: 12, color: MapColors.canvas),
-          // Dark pills with a white glow, matching the path on the map.
+            const Icon(Icons.arrow_forward, size: 12, color: MapColors.node),
+          // Black pills, matching the path on the map.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: MapColors.canvas,
+              color: MapColors.node,
               borderRadius: BorderRadius.circular(AppRadius.control),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  blurRadius: 6,
-                ),
-              ],
             ),
             child: Text(
               labels[i],
-              style: AppText.caption.copyWith(color: Colors.white),
+              style: AppText.caption.copyWith(color: AppColors.surface),
             ),
           ),
         ],
@@ -670,67 +657,25 @@ class _PathTrail extends StatelessWidget {
   }
 }
 
-// A soft glow in the middle of the dark map, behind the nodes.
-class _Glow extends StatelessWidget {
-  const _Glow();
-
-  @override
-  Widget build(BuildContext context) =>
-      const RepaintBoundary(child: CustomPaint(painter: _GlowPainter()));
-}
-
-class _GlowPainter extends CustomPainter {
-  const _GlowPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.shortestSide * 0.6;
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            MapColors.link.withValues(alpha: 0.12),
-            MapColors.link.withValues(alpha: 0.03),
-            Colors.transparent,
-          ],
-          stops: const [0, 0.55, 1],
-        ).createShader(Rect.fromCircle(center: center, radius: radius)),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_GlowPainter oldDelegate) => false;
-}
-
 class _Legend extends StatelessWidget {
   const _Legend();
 
   @override
   Widget build(BuildContext context) {
-    Widget item(Color color, String label) => Row(
+    // Nodes are all black, so the legend explains the lines.
+    Widget item(Color color, double width, String label) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 7,
-          height: 7,
+          width: 16,
+          height: width,
           decoration: BoxDecoration(
             color: color,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(color: color.withValues(alpha: 0.8), blurRadius: 6),
-            ],
+            borderRadius: BorderRadius.circular(width),
           ),
         ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: AppText.caption.copyWith(
-            color: Colors.white.withValues(alpha: 0.7),
-          ),
-        ),
+        const SizedBox(width: 6),
+        Text(label, style: AppText.caption.copyWith(color: AppColors.hint)),
       ],
     );
 
@@ -738,21 +683,17 @@ class _Legend extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.25),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: Wrap(
         alignment: WrapAlignment.center,
         spacing: 14,
         runSpacing: 2,
         children: [
-          item(AppColors.viewer, 'You'),
-          item(AppColors.contact, 'Contacts'),
-          item(MapColors.pathLink, 'Path'),
-          item(MapColors.privateLink, 'Private'),
+          item(MapColors.link, 2, 'Connection'),
+          item(MapColors.pathLink, 3, 'Path'),
+          item(MapColors.privateLink, 2, 'Private'),
         ],
       ),
     );

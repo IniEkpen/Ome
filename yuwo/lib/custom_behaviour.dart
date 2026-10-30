@@ -15,16 +15,15 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
 
         final highlighted = node.properties['highlighted'] == true;
 
-        final ownColor = node.properties['color'] as Color? ?? Colors.blueGrey;
-        // Nodes on a found path get a white ring that shimmers.
-        final ringColor = highlighted ? MapColors.pathLink : ownColor;
+        // Every node is black, like the rest of the app; a profile picture
+        // shows inside the black ring.
+        const ringColor = MapColors.node;
 
         final avatar = NetworkAvatar(
           diameter: diameter,
           image: node.properties['image'] as String?,
           initials: node.properties['initials'] as String? ?? '?',
           ringColor: ringColor,
-          faceColor: ownColor,
           highlighted: highlighted,
           gapColor: MapColors.canvas,
         );
@@ -40,7 +39,7 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
             color: Colors.transparent,
             borderWidth: 0,
             borderColor: Colors.transparent,
-            selectedBorderColor: ringColor.withValues(alpha: 0.5),
+            selectedBorderColor: ringColor.withValues(alpha: 0.3),
             padding: EdgeInsets.zero,
           ),
           child: _MapNode(
@@ -56,7 +55,7 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
             // easy to find.
             avatar: highlighted || node.properties['viewer'] == true
                 ? PulsingGlow(
-                    color: ringColor,
+                    color: ringColor.withValues(alpha: 0.45),
                     diameter: diameter,
                     forever: highlighted,
                     child: avatar,
@@ -73,7 +72,7 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
     return gv.GraphLinkViewBehavior(
       builder:
           (context, graph, link, sourceView, targetView, routing, geometry, _) {
-            // A found path shimmers white.
+            // A found path is a bold black line with a shimmer running along.
             if (link.properties['highlighted'] == true) {
               return ShimmerLink(
                 length: geometry.connectionPoints.distance,
@@ -81,8 +80,8 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
               );
             }
             final weight = (link.properties['weight'] as num? ?? 2).toDouble();
-            // Lines glow against the dark map: private purple, everything
-            // else a soft cyan.
+            // Grey lines so the black nodes stand out; private stays purple
+            // to match the Private toggle.
             final color = link.properties['color'] == AppColors.private
                 ? MapColors.privateLink
                 : MapColors.link;
@@ -96,8 +95,8 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
               thickness: 20,
               // weight is 2-10 (more transactions = thicker); scale it down so
               // busy pairs stand out without lines dwarfing the small nodes.
-              lineWidth: 1.4 + weight * 0.3,
-              color: color.withValues(alpha: 0.55 + weight * 0.04),
+              lineWidth: 1.2 + weight * 0.3,
+              color: color.withValues(alpha: 0.6 + weight * 0.04),
             );
           },
     );
@@ -134,9 +133,6 @@ class NetworkAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ring = diameter * (highlighted ? 0.09 : 0.065);
-    final light = Color.lerp(ringColor, Colors.white, 0.35)!;
-    final dark = Color.lerp(ringColor, Colors.black, 0.25)!;
-    final face = faceColor ?? ringColor;
 
     return Container(
       width: diameter,
@@ -144,16 +140,14 @@ class NetworkAvatar extends StatelessWidget {
       padding: EdgeInsets.all(ring),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [light, dark],
-        ),
+        color: ringColor,
+        // A soft drop shadow, like the app's cards, so nodes sit above the
+        // white map.
         boxShadow: [
           BoxShadow(
-            color: ringColor.withValues(alpha: highlighted ? 0.7 : 0.45),
-            blurRadius: diameter * (highlighted ? 0.55 : 0.32),
-            spreadRadius: diameter * (highlighted ? 0.04 : 0),
+            color: Colors.black.withValues(alpha: highlighted ? 0.3 : 0.18),
+            blurRadius: diameter * (highlighted ? 0.4 : 0.22),
+            offset: Offset(0, diameter * 0.06),
           ),
         ],
       ),
@@ -161,55 +155,15 @@ class NetworkAvatar extends StatelessWidget {
         // Thin white gap between the ring and the picture.
         padding: EdgeInsets.all(diameter * 0.025),
         decoration: BoxDecoration(shape: BoxShape.circle, color: gapColor),
-        child: ClipOval(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _face(
-                Color.lerp(face, Colors.white, 0.35)!,
-                Color.lerp(face, Colors.black, 0.25)!,
-              ),
-              // Gloss: a soft specular spot up top and a little shade at
-              // the bottom so the avatar reads as a rounded bead.
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment(-0.35, -0.65),
-                    radius: 0.85,
-                    colors: [
-                      Color(0x8CFFFFFF),
-                      Color(0x1FFFFFFF),
-                      Color(0x00FFFFFF),
-                    ],
-                    stops: [0, 0.4, 0.75],
-                  ),
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.center,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x00000000), Color(0x2E000000)],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        // No gloss on top, so a profile picture shows in its own colours.
+        child: ClipOval(child: _face(faceColor ?? ringColor)),
       ),
     );
   }
 
-  Widget _face(Color light, Color dark) {
-    Widget initialsFace() => DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [light, dark],
-        ),
-      ),
+  Widget _face(Color face) {
+    Widget initialsFace() => ColoredBox(
+      color: face,
       child: Center(
         child: Text(
           initials,
@@ -289,8 +243,8 @@ class _MapNodeState extends State<_MapNode> {
                     fontWeight: FontWeight.w600,
                     height: 1,
                     color: widget.highlighted
-                        ? MapColors.pathLink
-                        : Colors.white.withValues(alpha: 0.8),
+                        ? MapColors.node
+                        : MapColors.node.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -302,12 +256,13 @@ class _MapNodeState extends State<_MapNode> {
   }
 }
 
-/// Colours for the dark network map.
+/// Colours for the network map: black on white, like the rest of the app.
 abstract final class MapColors {
-  static const canvas = Color(0xFF101114);
-  static const link = Color(0xFF7DD3FC);
-  static const pathLink = Colors.white;
-  static const privateLink = Color(0xFFB79BFF);
+  static const canvas = AppColors.surface;
+  static const node = AppColors.textPrimary;
+  static const link = Color(0xFFB4B4B4);
+  static const pathLink = AppColors.textPrimary;
+  static const privateLink = AppColors.private;
 }
 
 /// A soft halo that slowly swells and fades around [child], drawn outside
@@ -359,7 +314,9 @@ class _PulsingGlowState extends State<PulsingGlow>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: widget.color.withValues(alpha: 0.25 + 0.35 * t),
+                color: widget.color.withValues(
+                  alpha: widget.color.a * (0.25 + 0.35 * t),
+                ),
                 blurRadius: widget.diameter * (0.35 + 0.45 * t),
                 spreadRadius: widget.diameter * (0.02 + 0.12 * t),
               ),
@@ -372,8 +329,8 @@ class _PulsingGlowState extends State<PulsingGlow>
   }
 }
 
-/// A link on a found path: a soft white glow with a bright core and a
-/// highlight that keeps sweeping along it. Drawn in the same local space as
+/// A link on a found path: a bold black line with a soft shadow and a light
+/// shimmer that keeps sweeping along it. Drawn in the same local space as
 /// plough's default renderer (a horizontal line [length] long, centred in a
 /// strip [thickness] tall).
 class ShimmerLink extends StatefulWidget {
@@ -434,7 +391,7 @@ class _ShimmerLinkPainter extends CustomPainter {
       start,
       end,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.28)
+        ..color = MapColors.pathLink.withValues(alpha: 0.14)
         ..strokeWidth = 9
         ..strokeCap = StrokeCap.round
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
@@ -443,12 +400,12 @@ class _ShimmerLinkPainter extends CustomPainter {
       start,
       end,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.85)
-        ..strokeWidth = 2.4
+        ..color = MapColors.pathLink
+        ..strokeWidth = 3.2
         ..strokeCap = StrokeCap.round,
     );
 
-    // A bright band, a third of the link long, sliding from end to end.
+    // A light band, a third of the link long, sliding from end to end.
     final band = length / 3;
     final x = -band + (length + band) * sweep.value;
     canvas.drawLine(
@@ -458,13 +415,13 @@ class _ShimmerLinkPainter extends CustomPainter {
         ..shader = LinearGradient(
           colors: [
             Colors.white.withValues(alpha: 0),
-            Colors.white,
+            Colors.white.withValues(alpha: 0.9),
             Colors.white.withValues(alpha: 0),
           ],
         ).createShader(Rect.fromLTWH(x, 0, band, thickness))
-        ..strokeWidth = 4.5
+        ..strokeWidth = 1.6
         ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.8),
     );
   }
 
