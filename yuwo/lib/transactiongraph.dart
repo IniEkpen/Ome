@@ -234,6 +234,7 @@ class TransactionGraphBuilder {
               ? const Color(0xFF477ED5)
               : const Color(0xFF52A98D),
           'highlighted': highlightedPath.contains(id),
+          'viewer': id == viewerId,
         },
       );
 

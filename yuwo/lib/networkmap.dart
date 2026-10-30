@@ -18,12 +18,8 @@ class Graph extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(
-          constraints.hasBoundedWidth
-              ? constraints.maxWidth
-              : 800,
-          constraints.hasBoundedHeight
-              ? constraints.maxHeight
-              : 600,
+          constraints.hasBoundedWidth ? constraints.maxWidth : 800,
+          constraints.hasBoundedHeight ? constraints.maxHeight : 600,
         );
 
         return gv.GraphView(
@@ -38,11 +34,7 @@ class Graph extends StatelessWidget {
 
 //backend current user implementation.. find their transactions
 class Network extends StatefulWidget {
-  const Network({
-    super.key,
-    required this.repository,
-    required this.viewerId,
-  });
+  const Network({super.key, required this.repository, required this.viewerId});
 
   final NetworkRepository repository;
   final String viewerId;
@@ -51,16 +43,12 @@ class Network extends StatefulWidget {
   State<Network> createState() => _NetworkState();
 }
 
-class _NetworkState extends State<Network>
-    with SingleTickerProviderStateMixin {
-
+class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
   late TransactionGraphBuilder builder;
 
-  late final TransformationController camera =
-      TransformationController();
+  late final TransformationController camera = TransformationController();
 
-  late final AnimationController animation =
-      AnimationController(
+  late final AnimationController animation = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 850),
   );
@@ -85,9 +73,7 @@ class _NetworkState extends State<Network>
   void initState() {
     super.initState();
 
-    builder = TransactionGraphBuilder(
-      viewerId: widget.viewerId,
-    );
+    builder = TransactionGraphBuilder(viewerId: widget.viewerId);
 
     animation.addListener(() {
       if (cameraTween != null) {
@@ -160,8 +146,7 @@ class _NetworkState extends State<Network>
     if (!value) return;
 
     try {
-      final payload =
-          await widget.repository.loadMyPrivateTransactions();
+      final payload = await widget.repository.loadMyPrivateTransactions();
 
       if (!mounted) return;
 
@@ -186,8 +171,7 @@ class _NetworkState extends State<Network>
     }
 
     try {
-      final result =
-          await widget.repository.searchUsers(query.trim());
+      final result = await widget.repository.searchUsers(query.trim());
 
       if (mounted && version == searchVersion) {
         setState(() => suggestions = result);
@@ -212,8 +196,7 @@ class _NetworkState extends State<Network>
     });
 
     try {
-      final payload =
-          await widget.repository.findPublicPath(
+      final payload = await widget.repository.findPublicPath(
         viewerId: widget.viewerId,
         targetId: target.id,
       );
@@ -233,10 +216,7 @@ class _NetworkState extends State<Network>
 
         path = payload.path;
 
-        extraIds = {
-          ...payload.parties.map((p) => p.id),
-          ...path,
-        };
+        extraIds = {...payload.parties.map((p) => p.id), ...path};
 
         busy = false;
       });
@@ -260,12 +240,7 @@ class _NetworkState extends State<Network>
     cameraTween = Matrix4Tween(
       begin: camera.value.clone(),
       end: target,
-    ).animate(
-      CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeInOutCubic,
-      ),
-    );
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic));
 
     animation.forward(from: 0);
   }
@@ -277,7 +252,6 @@ class _NetworkState extends State<Network>
     camera.dispose();
     super.dispose();
   }
-
 
   void _resetView() {
     setState(() {
@@ -346,9 +320,12 @@ class _NetworkState extends State<Network>
                       children: [
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('Layer', style: AppText.caption.copyWith(
-                            color: AppColors.hint,
-                          )),
+                          child: Text(
+                            'Layer',
+                            style: AppText.caption.copyWith(
+                              color: AppColors.hint,
+                            ),
+                          ),
                         ),
                         for (var i = 1; i <= 4; i++)
                           _LayerChip(
@@ -419,8 +396,9 @@ class _NetworkState extends State<Network>
                           return ListTile(
                             dense: true,
                             visualDensity: VisualDensity.compact,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
                             leading: NetworkAvatar(
                               diameter: 30,
                               image: party.image,
@@ -461,9 +439,7 @@ class _NetworkState extends State<Network>
                       const SizedBox(width: 6),
                       Text(
                         message!,
-                        style: AppText.caption.copyWith(
-                          color: AppColors.error,
-                        ),
+                        style: AppText.caption.copyWith(color: AppColors.error),
                       ),
                     ],
                   ),
@@ -486,18 +462,24 @@ class _NetworkState extends State<Network>
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppRadius.card),
-                    boxShadow: AppShadows.card,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.card),
                     child: ColoredBox(
-                      color: AppColors.surface,
+                      color: MapColors.canvas,
                       child: Column(
                         children: [
                           Expanded(
                             child: Stack(
                               children: [
-                                const Positioned.fill(child: _DotGrid()),
+                                const Positioned.fill(child: _Glow()),
                                 // minScale 1 keeps the map from shrinking
                                 // into a corner of the box; with no
                                 // boundary margin it can't be panned
@@ -518,6 +500,8 @@ class _NetworkState extends State<Network>
                                     right: 0,
                                     child: LinearProgressIndicator(
                                       minHeight: 2,
+                                      color: MapColors.link,
+                                      backgroundColor: Colors.transparent,
                                     ),
                                   ),
                               ],
@@ -661,16 +645,9 @@ class _PathTrail extends StatelessWidget {
       children: [
         for (var i = 0; i < labels.length; i++) ...[
           if (i > 0)
-            const Icon(
-              Icons.arrow_forward,
-              size: 12,
-              color: AppColors.path,
-            ),
+            const Icon(Icons.arrow_forward, size: 12, color: AppColors.path),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 3,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: AppColors.path.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadius.control),
@@ -686,31 +663,39 @@ class _PathTrail extends StatelessWidget {
   }
 }
 
-// Faint dot pattern behind the graph so the map reads as a canvas.
-class _DotGrid extends StatelessWidget {
-  const _DotGrid();
+// A soft glow in the middle of the dark map, behind the nodes.
+class _Glow extends StatelessWidget {
+  const _Glow();
 
   @override
   Widget build(BuildContext context) =>
-      const CustomPaint(painter: _DotGridPainter());
+      const RepaintBoundary(child: CustomPaint(painter: _GlowPainter()));
 }
 
-class _DotGridPainter extends CustomPainter {
-  const _DotGridPainter();
+class _GlowPainter extends CustomPainter {
+  const _GlowPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0x14000000);
-    const gap = 18.0;
-    for (var y = gap / 2; y < size.height; y += gap) {
-      for (var x = gap / 2; x < size.width; x += gap) {
-        canvas.drawCircle(Offset(x, y), 0.9, paint);
-      }
-    }
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.6;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            MapColors.link.withValues(alpha: 0.12),
+            MapColors.link.withValues(alpha: 0.03),
+            Colors.transparent,
+          ],
+          stops: const [0, 0.55, 1],
+        ).createShader(Rect.fromCircle(center: center, radius: radius)),
+    );
   }
 
   @override
-  bool shouldRepaint(_DotGridPainter oldDelegate) => false;
+  bool shouldRepaint(_GlowPainter oldDelegate) => false;
 }
 
 class _Legend extends StatelessWidget {
@@ -722,12 +707,23 @@ class _Legend extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: color.withValues(alpha: 0.8), blurRadius: 6),
+            ],
+          ),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: AppText.caption.copyWith(color: AppColors.hint)),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: AppText.caption.copyWith(
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
+        ),
       ],
     );
 
@@ -735,8 +731,11 @@ class _Legend extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.divider)),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.25),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
       ),
       child: Wrap(
         alignment: WrapAlignment.center,
@@ -745,8 +744,8 @@ class _Legend extends StatelessWidget {
         children: [
           item(AppColors.viewer, 'You'),
           item(AppColors.contact, 'Contacts'),
-          item(AppColors.path, 'Path'),
-          item(AppColors.private, 'Private'),
+          item(MapColors.pathLink, 'Path'),
+          item(MapColors.privateLink, 'Private'),
         ],
       ),
     );
