@@ -645,16 +645,23 @@ class _PathTrail extends StatelessWidget {
       children: [
         for (var i = 0; i < labels.length; i++) ...[
           if (i > 0)
-            const Icon(Icons.arrow_forward, size: 12, color: AppColors.path),
+            const Icon(Icons.arrow_forward, size: 12, color: MapColors.canvas),
+          // Dark pills with a white glow, matching the path on the map.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.path.withValues(alpha: 0.12),
+              color: MapColors.canvas,
               borderRadius: BorderRadius.circular(AppRadius.control),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                ),
+              ],
             ),
             child: Text(
               labels[i],
-              style: AppText.caption.copyWith(color: AppColors.path),
+              style: AppText.caption.copyWith(color: Colors.white),
             ),
           ),
         ],
