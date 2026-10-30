@@ -29,16 +29,17 @@ class FakeNetworkRepository implements NetworkRepository {
     Party(id: 'fay', label: 'fay'),
   ];
 
-  // (id, sender, recipient, amount, private, layer it first appears in)
+  // (id, sender, recipient, amount, private, layer it first appears in,
+  // days ago)
   static const _txs = [
-    ('1', 'me', 'ada', 24.0, false, 1),
-    ('2', 'me', 'ben', 12.5, false, 1),
-    ('3', 'cleo', 'me', 40.0, false, 1),
-    ('4', 'ada', 'dev', 8.0, false, 2),
-    ('5', 'ben', 'cleo', 15.0, false, 2),
-    ('6', 'dev', 'eli', 30.0, false, 3),
-    ('7', 'eli', 'fay', 9.0, false, 4),
-    ('8', 'me', 'fay', 50.0, true, 0),
+    ('1', 'me', 'ada', 24.0, false, 1, 2),
+    ('2', 'me', 'ben', 12.5, false, 1, 5),
+    ('3', 'cleo', 'me', 40.0, false, 1, 95),
+    ('4', 'ada', 'dev', 8.0, false, 2, 10),
+    ('5', 'ben', 'cleo', 15.0, false, 2, 120),
+    ('6', 'dev', 'eli', 30.0, false, 3, 20),
+    ('7', 'eli', 'fay', 9.0, false, 4, 3),
+    ('8', 'me', 'fay', 50.0, true, 0, 1),
   ];
 
   List<TransactionRecord> _records(bool Function(dynamic t) keep) => [
@@ -50,6 +51,7 @@ class FakeNetworkRepository implements NetworkRepository {
           recipientId: t.$3,
           amount: t.$4,
           isPrivate: t.$5,
+          timestamp: DateTime.now().subtract(Duration(days: t.$7)),
         ),
   ];
 

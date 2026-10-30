@@ -298,6 +298,12 @@ class TransactionGraphBuilder {
             'weight': isPath ? 5.0 : (2 + txs.length).clamp(2, 10).toDouble(),
             'totalAmount': txs.fold<double>(0, (sum, tx) => sum + tx.amount),
             'transactionCount': txs.length,
+            'private': txs.every((t) => t.isPrivate),
+            // A link that touches the viewer is one of their own connections.
+            'direct': ends.contains(viewerId),
+            'lastActivity': txs
+                .map((t) => t.timestamp)
+                .reduce((a, b) => a.isAfter(b) ? a : b),
             'history': txs,
             'highlighted': isPath,
           },

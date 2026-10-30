@@ -662,16 +662,23 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Nodes are all black, so the legend explains the lines.
-    Widget item(Color color, double width, String label) => Row(
+    // Nodes are all black, so the legend explains what each line means.
+    Widget item(
+      String label,
+      Color color,
+      double width, [
+      (double, double)? dash,
+    ]) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 16,
-          height: width,
-          decoration: BoxDecoration(
+        CustomPaint(
+          size: const Size(18, 8),
+          painter: LinkPainter(
             color: color,
-            borderRadius: BorderRadius.circular(width),
+            width: width,
+            length: 18,
+            thickness: 8,
+            dash: dash,
           ),
         ),
         const SizedBox(width: 6),
@@ -691,9 +698,9 @@ class _Legend extends StatelessWidget {
         spacing: 14,
         runSpacing: 2,
         children: [
-          item(MapColors.link, 2, 'Connection'),
-          item(MapColors.pathLink, 3, 'Path'),
-          item(MapColors.privateLink, 2, 'Private'),
+          for (final style in LinkStyle.values)
+            item(style.label, style.color, style.width, style.dash),
+          item('Path', MapColors.pathLink, 3.2),
         ],
       ),
     );

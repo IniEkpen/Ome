@@ -80,23 +80,17 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
               );
             }
             final weight = (link.properties['weight'] as num? ?? 2).toDouble();
-            // Grey lines so the black nodes stand out; private stays purple
-            // to match the Private toggle.
-            final color = link.properties['color'] == AppColors.private
-                ? MapColors.privateLink
-                : MapColors.link;
-
-            return gv.GraphDefaultLinkRenderer(
-              link: link,
-              sourceView: sourceView,
-              targetView: targetView,
-              routing: routing,
-              geometry: geometry,
-              thickness: 20,
-              // weight is 2-10 (more transactions = thicker); scale it down so
-              // busy pairs stand out without lines dwarfing the small nodes.
-              lineWidth: 1.2 + weight * 0.3,
-              color: color.withValues(alpha: 0.6 + weight * 0.04),
+            final style = LinkStyle.of(link.properties);
+            return CustomPaint(
+              painter: LinkPainter(
+                color: style.color,
+                dash: style.dash,
+                length: geometry.connectionPoints.distance,
+                thickness: 20,
+                // weight is 2-10 (more transactions = thicker); scale it down
+                // so busy pairs stand out without dwarfing the small nodes.
+                width: style.width + (weight - 2) * 0.25,
+              ),
             );
           },
     );
@@ -181,10 +175,21 @@ class NetworkAvatar extends StatelessWidget {
     if (source == null || source.isEmpty) return initialsFace();
     Widget onError(BuildContext context, Object error, StackTrace? stack) =>
         initialsFace();
-    return source.startsWith('http')
-        ? Image.network(source, fit: BoxFit.cover, errorBuilder: onError)
-        : Image.asset(source, fit: BoxFit.cover, errorBuilder: onError);
+    // Photos show in black and white so they sit with the black nodes.
+    return ColorFiltered(
+      colorFilter: _greyscale,
+      child: source.startsWith('http')
+          ? Image.network(source, fit: BoxFit.cover, errorBuilder: onError)
+          : Image.asset(source, fit: BoxFit.cover, errorBuilder: onError),
+    );
   }
+
+  static const _greyscale = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0, 0, 0, 1, 0,
+  ]);
 }
 
 /// A node's avatar with its name, which hangs below without changing the
@@ -260,9 +265,94 @@ class _MapNodeState extends State<_MapNode> {
 abstract final class MapColors {
   static const canvas = AppColors.surface;
   static const node = AppColors.textPrimary;
-  static const link = Color(0xFFB4B4B4);
   static const pathLink = AppColors.textPrimary;
-  static const privateLink = AppColors.private;
+}
+
+/// What a line on the map means, told apart by shade and pattern rather
+/// than colour so the map stays black and white.
+enum LinkStyle {
+  /// You and someone you've paid or been paid by.
+  yours('Yours', Color(0xFF3C3C3C), 1.6, null),
+
+  /// Two other people further out in your network.
+  others('Others', Color(0xFFC4C4C4), 1.3, null),
+
+  /// One of your private payments, which only you two can see.
+  private('Private', Color(0xFF3C3C3C), 1.6, (6.0, 4.0)),
+
+  /// Nobody on this line has paid the other in a while.
+  inactive('Inactive', Color(0xFF9E9E9E), 2.2, (0.01, 5.0));
+
+  const LinkStyle(this.label, this.color, this.width, this.dash);
+
+  final String label;
+  final Color color;
+  final double width;
+
+  /// (dash, gap) in pixels; null for a solid line. A near-zero dash with
+  /// round caps draws dots.
+  final (double, double)? dash;
+
+  static const inactiveAfter = Duration(days: 60);
+
+  static LinkStyle of(Map<String, dynamic> properties) {
+    if (properties['private'] == true) return private;
+    final last = properties['lastActivity'] as DateTime?;
+    if (last != null && DateTime.now().difference(last) > inactiveAfter) {
+      return inactive;
+    }
+    return properties['direct'] == true ? yours : others;
+  }
+}
+
+/// Draws a link in the same local space as plough's default renderer: a
+/// horizontal line [length] long, centred in a strip [thickness] tall.
+/// Also used for the legend's samples.
+class LinkPainter extends CustomPainter {
+  const LinkPainter({
+    required this.color,
+    required this.width,
+    required this.length,
+    required this.thickness,
+    this.dash,
+  });
+
+  final Color color;
+  final double width;
+  final double length;
+  final double thickness;
+  final (double, double)? dash;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = thickness / 2;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round;
+    final pattern = dash;
+    if (pattern == null) {
+      canvas.drawLine(Offset(0, y), Offset(length, y), paint);
+      return;
+    }
+    final (on, off) = pattern;
+    // Round caps add half a stroke to each end, so leave room for them.
+    for (var x = width / 2; x < length - width / 2; x += on + off + width) {
+      canvas.drawLine(
+        Offset(x, y),
+        Offset((x + on).clamp(0, length - width / 2), y),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(LinkPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.width != width ||
+      oldDelegate.length != length ||
+      oldDelegate.thickness != thickness ||
+      oldDelegate.dash != dash;
 }
 
 /// A soft halo that slowly swells and fades around [child], drawn outside
