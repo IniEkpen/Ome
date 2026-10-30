@@ -124,6 +124,18 @@ class Profile {
         return user.card_exp_year > year || (user.card_exp_year === year && user.card_exp_month >= month)
     }
 
+    // Anyone can host a bill, so everyone verifies with Stripe: onboarding is
+    // fully submitted, transfers and bank payouts are active, and nothing is due.
+    static HasVerifiedPayouts(user) {
+        return Boolean(user?.payouts_enabled) && user?.connect_payouts_status === 'active' &&
+            !user?.connect_requirements_due
+    }
+
+    // A valid card to pay with plus a verified account to be paid back into.
+    static HasCompletedPaymentSetup(user) {
+        return Profile.HasValidCard(user) && Profile.HasVerifiedPayouts(user)
+    }
+
     static CardSummary(user) {
         return {
             hasValidCard: Profile.HasValidCard(user),
@@ -132,6 +144,7 @@ class Profile {
             expMonth: user?.card_exp_month || null,
             expYear: user?.card_exp_year || null,
             payoutsEnabled: Boolean(user?.payouts_enabled),
+            paymentsVerified: Profile.HasVerifiedPayouts(user),
         }
     }
 
@@ -140,6 +153,7 @@ class Profile {
         return {
             hasAccount: Boolean(user?.stripe_connect_account_id),
             payoutsEnabled: Boolean(user?.payouts_enabled),
+            verified: Profile.HasVerifiedPayouts(user),
             transfersStatus: user?.connect_transfers_status || null,
             bankPayoutsStatus: user?.connect_payouts_status || null,
             requirementsDue: Boolean(user?.connect_requirements_due),

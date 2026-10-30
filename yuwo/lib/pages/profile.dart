@@ -179,7 +179,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: AppSpacing.section),
               const SectionHeader(
                 'Payment',
-                subtitle: 'A valid card is required to create or join groups',
+                subtitle: 'Finish both steps to create or join groups',
               ),
               const SizedBox(height: AppSpacing.field),
               const _PaymentCard(),
@@ -236,6 +236,14 @@ class _PaymentCardState extends State<_PaymentCard> {
     }
   }
 
+  Future<void> _verify() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const Pay()));
+    // Onboarding may have just finished; show the new status.
+    if (mounted) setState(() => _status = _payments.cardStatus());
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCard(
@@ -245,35 +253,23 @@ class _PaymentCardState extends State<_PaymentCard> {
         builder: (context, snapshot) {
           final card = snapshot.data ?? CardStatus.none;
           final loading = snapshot.connectionState != ConnectionState.done;
+          final failed = !loading && snapshot.hasError;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    card.hasValidCard
-                        ? Icons.credit_card
-                        : Icons.credit_card_off,
-                    color: card.hasValidCard
-                        ? AppColors.textPrimary
-                        : AppColors.hint,
-                  ),
-                  const SizedBox(width: AppSpacing.field),
-                  Expanded(
-                    child: Text(
-                      loading
-                          ? 'Checking…'
-                          : snapshot.hasError
-                          ? "Couldn't load your card"
-                          : card.hasValidCard
-                          ? card.label
-                          : card.last4 == null
-                          ? 'No card on file'
-                          : '${card.label} (expired)',
-                      style: AppText.body,
-                    ),
-                  ),
-                ],
+              _SetupStep(
+                step: 1,
+                title: 'Card',
+                done: card.hasValidCard,
+                detail: loading
+                    ? 'Checking…'
+                    : failed
+                    ? "Couldn't load your card"
+                    : card.hasValidCard
+                    ? card.label
+                    : card.last4 == null
+                    ? 'No card on file. Used to pay your share of a bill.'
+                    : '${card.label} (expired)',
               ),
               const SizedBox(height: AppSpacing.field),
               LoadingButton(
@@ -281,28 +277,78 @@ class _PaymentCardState extends State<_PaymentCard> {
                 loading: _adding,
                 onPressed: _addCard,
               ),
-              const SizedBox(height: AppSpacing.field),
-              // Hosts receive what members pay through Stripe Connect.
-              TextButton(
-                onPressed: () async {
-                  await Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const Pay()));
-                  // Onboarding may have just finished; show the new status.
-                  if (mounted) {
-                    setState(() => _status = _payments.cardStatus());
-                  }
-                },
-                child: Text(
-                  card.payoutsEnabled
-                      ? 'Payouts set up'
-                      : 'Set up payouts (for hosts)',
-                ),
+              const Divider(height: AppSpacing.gap * 2),
+              // Everyone verifies with Stripe Connect, since anyone can host
+              // a bill and be paid back. Groups need this and a card.
+              _SetupStep(
+                step: 2,
+                title: 'Payment verification',
+                done: card.paymentsVerified,
+                detail: loading
+                    ? 'Checking…'
+                    : card.paymentsVerified
+                    ? "Verified. Money you're paid back goes to your bank."
+                    : 'Verify your identity and bank with Stripe so you can '
+                          'be paid back when you host. Every step must be '
+                          'completed.',
               ),
+              const SizedBox(height: AppSpacing.field),
+              card.paymentsVerified
+                  ? OutlinedButton(
+                      onPressed: _verify,
+                      child: const Text('Update payment details'),
+                    )
+                  : ElevatedButton(
+                      onPressed: loading ? null : _verify,
+                      child: const Text('Start payment verification'),
+                    ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+/// One numbered step of payment setup, with a tick once it's done.
+class _SetupStep extends StatelessWidget {
+  const _SetupStep({
+    required this.step,
+    required this.title,
+    required this.done,
+    required this.detail,
+  });
+
+  final int step;
+  final String title;
+  final bool done;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: done ? AppColors.path : AppColors.divider,
+          foregroundColor: done ? AppColors.surface : AppColors.textSoft,
+          child: done
+              ? const Icon(Icons.check, size: 16)
+              : Text('$step', style: AppText.caption),
+        ),
+        const SizedBox(width: AppSpacing.field),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppText.sectionTitle.copyWith(fontSize: 16)),
+              const SizedBox(height: 2),
+              Text(detail, style: AppText.caption),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

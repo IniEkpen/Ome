@@ -3,6 +3,7 @@ const { requireUser, HttpError } = require('../auth')
 const { group: Group } = require('../models/Group')
 const { profile, Profile } = require('../models/Profile')
 const splits = require('../services/splitService')
+const payments = require('../services/paymentService')
 const { subscribe } = require('../services/splitEvents')
 
 router.use(requireUser)
@@ -13,11 +14,17 @@ function idParam(req, name) {
     return id
 }
 
-// You can't create or join a group without a valid card on file.
-async function requireValidCard(userId) {
+// You can't create or join a group until payment setup is complete: a valid
+// card to pay your share, and a fully verified Stripe account so you can be
+// paid back when you host.
+async function requirePaymentSetup(userId) {
     const user = await profile.GetProfileById(userId)
     if (!Profile.HasValidCard(user)) {
         throw new HttpError(402, 'Add a valid card before creating or joining a group.', 'card_required')
+    }
+    if (!Profile.HasVerifiedPayouts(await payments.refreshConnectStatus(user))) {
+        throw new HttpError(402, 'Finish payment verification before creating or joining a group.',
+            'payment_verification_required')
     }
 }
 
@@ -38,7 +45,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const groupName = typeof req.body?.groupName === 'string' ? req.body.groupName.trim() : ''
     if (!groupName || groupName.length > 255) throw new HttpError(400, 'Give the group a name.', 'invalid_name')
-    await requireValidCard(req.user.id)
+    await requirePaymentSetup(req.user.id)
 
     const requested = Array.isArray(req.body.members) ? req.body.members.filter((m) => typeof m === 'string') : []
     const found = await profile.GetProfilesByUsernames(requested)
@@ -52,11 +59,11 @@ router.post('/', async (req, res) => {
     })
 })
 
-// Accept (needs a valid card) or decline an invite.
+// Accept (needs payment setup) or decline an invite.
 router.post('/:groupId/invites/respond', async (req, res) => {
     const groupId = idParam(req, 'groupId')
     const accept = req.body?.accept === true
-    if (accept) await requireValidCard(req.user.id)
+    if (accept) await requirePaymentSetup(req.user.id)
     if (!(await Group.RespondToInvite(groupId, req.user.id, accept))) {
         throw new HttpError(404, 'That invite is no longer open.', 'not_found')
     }

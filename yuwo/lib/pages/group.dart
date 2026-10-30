@@ -79,7 +79,8 @@ class _GroupsPageState extends State<GroupsPage> {
               children: [
                 SectionHeader(
                   'Invites',
-                  subtitle: 'A card on file is required to join',
+                  subtitle:
+                      'Add a card and verify your payment details to join',
                 ),
                 SizedBox(height: AppSpacing.field),
                 SingleChildScrollView(
@@ -150,8 +151,8 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     setState(() => _loading = true);
     final name = _groupName.text.trim();
     var notFound = const <String>[];
-    // Creating a group needs a valid card; runWithCard asks for one if missing.
-    final created = await runWithCard(context, () async {
+    // Creating a group needs a card and payment verification; this asks for them.
+    final created = await runWithPaymentSetup(context, () async {
       notFound = await GroupService(
         AuthScope.read(context),
       ).createGroup(groupName: name, members: _memberList);
@@ -184,7 +185,8 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           children: [
             const SectionHeader(
               'Create a Group',
-              subtitle: 'A card on file is required to create a group',
+              subtitle:
+                  'Add a card and verify your payment details to create a group',
             ),
             const SizedBox(height: AppSpacing.gap),
             TextFormField(

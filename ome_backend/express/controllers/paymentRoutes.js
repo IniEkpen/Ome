@@ -107,19 +107,9 @@ async function currentUser(req) {
     return user
 }
 
-// Re-reads a host's payout status from Stripe while it isn't active yet, so the
-// app sees onboarding finish even when the accounts webhook isn't configured.
-async function currentUserWithFreshConnect(req, { always = false } = {}) {
-    const user = await currentUser(req)
-    if (!user.stripe_connect_account_id || !isStripeConfigured()) return user
-    if (user.payouts_enabled && !always) return user
-    try {
-        await payments.syncConnectAccount(user.stripe_connect_account_id)
-    } catch (error) {
-        console.error('Refreshing payout status failed:', error.code || error.message)
-        return user
-    }
-    return currentUser(req)
+// The user with their payment verification status re-read from Stripe.
+async function currentUserWithFreshConnect(req, options) {
+    return payments.refreshConnectStatus(await currentUser(req), options)
 }
 
 router.get('/card', async (req, res) => {
@@ -144,14 +134,14 @@ router.post('/card/confirm', async (req, res) => {
     return res.json({ card: Profile.CardSummary(await currentUser(req)) })
 })
 
-// A host's payout account status, refreshed from Stripe.
+// The user's payment verification (Connect account) status, refreshed from Stripe.
 router.get('/connect', async (req, res) => {
     const user = await currentUserWithFreshConnect(req, { always: true })
     return res.json({ connect: Profile.ConnectSummary(user), paymentsEnabled: isStripeConfigured() })
 })
 
-// Hosts onboard to Stripe Connect inside the app (embedded component) so the
-// money people pay them can be paid out.
+// Everyone onboards to Stripe Connect inside the app (embedded component),
+// since anyone may host a bill and be paid back.
 router.post('/connect/account-session', async (req, res) => {
     return res.json(await payments.createConnectAccountSession(await currentUser(req)))
 })

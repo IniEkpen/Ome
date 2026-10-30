@@ -102,7 +102,7 @@ class _InviteCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => runWithCard(
+                  onPressed: () => runWithPaymentSetup(
                     context,
                     () => context.read<GroupsState>().respond(group, false),
                   ),
@@ -117,8 +117,8 @@ class _InviteCard extends StatelessWidget {
               ),
               Expanded(
                 child: ElevatedButton(
-                  // Joining needs a valid card; runWithCard asks for one if missing.
-                  onPressed: () => runWithCard(
+                  // Joining needs a card and payment verification; this asks for them.
+                  onPressed: () => runWithPaymentSetup(
                     context,
                     () => context.read<GroupsState>().respond(group, true),
                   ),
