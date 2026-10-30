@@ -15,17 +15,19 @@ void main() {
 
   Future<List<http.Request>> pumpGroups(
     WidgetTester tester, {
-    String? createErrorCode,
+    bool verified = true,
   }) async {
     final requests = <http.Request>[];
     final auth = AuthService(
       client: ApiClient(
         httpClient: MockClient((request) async {
           requests.add(request);
-          if (request.method == 'POST' && createErrorCode != null) {
+          if (request.url.path == '/payments/card') {
             return http.Response(
-              jsonEncode({'error': 'Not set up', 'code': createErrorCode}),
-              402,
+              jsonEncode({
+                'card': {'hasValidCard': true, 'paymentsVerified': verified},
+              }),
+              200,
             );
           }
           if (request.method == 'POST') {
@@ -106,27 +108,22 @@ void main() {
     expect(find.text('Group "Dinner" created. Invites sent.'), findsOneWidget);
   });
 
-  testWidgets('creating without payment verification asks the user to verify', (
+  testWidgets('without payment verification, + asks to verify first', (
     tester,
   ) async {
-    final requests = await pumpGroups(
-      tester,
-      createErrorCode: 'payment_verification_required',
-    );
+    final requests = await pumpGroups(tester, verified: false);
     await tester.tap(find.byTooltip('Create group'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(0), 'Dinner');
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create Group'));
-    // The button's spinner keeps animating while the dialog is up, so the
-    // frames never settle; pump a fixed time instead.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Verify your payment details'), findsOneWidget);
     await tester.tap(find.text('Not now'));
     await tester.pumpAndSettle();
 
-    expect(requests.where((r) => r.method == 'POST'), hasLength(1));
-    expect(find.text('Create a Group'), findsOneWidget, reason: 'stays open');
+    expect(
+      find.text('Create a Group'),
+      findsNothing,
+      reason: 'form never opens',
+    );
+    expect(requests.where((r) => r.method == 'POST'), isEmpty);
   });
 }
