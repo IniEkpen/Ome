@@ -4,6 +4,7 @@ import 'package:plough/plough.dart' as gv;
 import 'custom_behaviour.dart';
 import 'edgechecker.dart';
 import 'network_repository.dart';
+import 'services/api_client.dart';
 import 'transactiongraph.dart';
 import 'theme/app_theme.dart';
 import 'widgets/common.dart';
@@ -129,11 +130,11 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
         _merge(payload);
         busy = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == requestVersion) {
         setState(() {
           busy = false;
-          message = 'Unable to load network';
+          message = _errorText(e, 'Unable to load network');
         });
       }
     }
@@ -151,11 +152,11 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
       if (!mounted) return;
 
       setState(() => _merge(payload));
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           showMyPrivate = false;
-          message = 'Unable to load private transactions';
+          message = _errorText(e, 'Unable to load private transactions');
         });
       }
     }
@@ -224,15 +225,20 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
       // The layout always fits every node inside the map, so showing the
       // whole path just means easing back to the un-zoomed view.
       _animateCamera(Matrix4.identity());
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == requestVersion) {
         setState(() {
           busy = false;
-          message = 'Search failed';
+          message = _errorText(e, 'Search failed');
         });
       }
     }
   }
+
+  // The server's own message (e.g. "Please sign in again.") says more than
+  // a generic one.
+  static String _errorText(Object error, String fallback) =>
+      error is ApiException ? error.message : fallback;
 
   void _animateCamera(Matrix4 target) {
     animation.stop();
