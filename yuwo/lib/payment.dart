@@ -39,9 +39,17 @@ class _Payment extends State<Pay> {
     }
     final payments = PaymentService(AuthScope.read(context));
     try {
+      // Fetched before Stripe opens so a failure (e.g. signed out) shows our
+      // message; inside Stripe it only says "authentication error". Stripe
+      // uses this one first and asks for fresh ones when it needs them.
+      String? first = await payments.connectOnboardingSecret();
       await StripeConnect.instance.initialize(
         publishableKey: StripeConfig.publishableKey,
-        clientSecretProvider: payments.connectOnboardingSecret,
+        clientSecretProvider: () async {
+          final secret = first;
+          first = null;
+          return secret ?? await payments.connectOnboardingSecret();
+        },
       );
       // Checks if the screen is still active before updating UI
       if (mounted) setState(() => _isStripeReady = true);
