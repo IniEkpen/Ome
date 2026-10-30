@@ -128,6 +128,21 @@ class PaymentService {
     return CardStatus.fromJson(response.json?['card'] as Map<String, dynamic>?);
   }
 
+  /// Status right after onboarding closes. Stripe takes a few seconds to
+  /// activate a just-submitted account, so this checks again for a while
+  /// before giving up on it being verified.
+  Future<CardStatus> statusAfterVerification({
+    int attempts = 5,
+    Duration interval = const Duration(seconds: 2),
+  }) async {
+    var status = await cardStatus();
+    for (var i = 1; i < attempts && !status.paymentsVerified; i++) {
+      await Future<void>.delayed(interval);
+      status = await cardStatus();
+    }
+    return status;
+  }
+
   /// Opens Stripe's card sheet and saves the card as the default for splits.
   /// Returns null if the user closed the sheet without adding a card.
   Future<CardStatus?> addCard() async {

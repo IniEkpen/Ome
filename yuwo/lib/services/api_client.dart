@@ -95,6 +95,10 @@ class ApiClient {
   final http.Client _http;
   final String? Function()? tokenProvider;
 
+  /// Called when the server rejects the token we sent (401), e.g. it expired
+  /// or the server's signing secret changed. AuthService signs out here.
+  void Function()? onUnauthorized;
+
   Map<String, String> _headers({String accept = 'application/json'}) {
     final headers = {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -134,6 +138,10 @@ class ApiClient {
       final response = await http.Response.fromStream(
         streamed,
       ).timeout(ApiConfig.timeout);
+      if (response.statusCode == 401 &&
+          request.headers.containsKey('Authorization')) {
+        onUnauthorized?.call();
+      }
       return ApiResponse(response.statusCode, _decode(response.body));
     } on TimeoutException {
       throw const ApiException('The server took too long to respond.');

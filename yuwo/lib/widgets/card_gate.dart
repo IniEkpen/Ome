@@ -74,7 +74,9 @@ Future<bool> ensurePaymentVerification(BuildContext context) async {
   ).push(MaterialPageRoute(builder: (_) => const Pay()));
   if (!context.mounted) return false;
   try {
-    final status = await PaymentService(AuthScope.read(context)).cardStatus();
+    final status = await PaymentService(
+      AuthScope.read(context),
+    ).statusAfterVerification();
     if (!status.paymentsVerified && context.mounted) {
       showMessage(
         context,
@@ -87,6 +89,24 @@ Future<bool> ensurePaymentVerification(BuildContext context) async {
     if (context.mounted) showMessage(context, e.message);
     return false;
   }
+}
+
+/// Checks payment setup up front (e.g. before opening the create form) and
+/// walks the user through whatever is missing. Returns true once both the
+/// card and verification are done. The server still enforces this.
+Future<bool> ensurePaymentSetup(BuildContext context) async {
+  final CardStatus status;
+  try {
+    status = await PaymentService(AuthScope.read(context)).cardStatus();
+  } on ApiException catch (e) {
+    if (context.mounted) showMessage(context, e.message);
+    return false;
+  }
+  if (!context.mounted) return false;
+  if (!status.hasValidCard && !await ensureCard(context)) return false;
+  if (!context.mounted) return false;
+  if (status.paymentsVerified) return true;
+  return ensurePaymentVerification(context);
 }
 
 /// Runs [action]. If the server says payment setup is incomplete (no card,

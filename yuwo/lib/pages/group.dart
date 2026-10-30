@@ -38,6 +38,8 @@ class _GroupsPageState extends State<GroupsPage> {
   }
 
   Future<void> _createGroup() async {
+    // Stop before the form, not after it's filled in.
+    if (!await ensurePaymentSetup(context) || !mounted) return;
     final message = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,

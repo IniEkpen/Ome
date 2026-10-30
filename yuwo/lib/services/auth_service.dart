@@ -76,6 +76,11 @@ class AuthService extends ChangeNotifier {
     this.devLogin = devLoginDefault,
   }) {
     _client = client ?? ApiClient(tokenProvider: () => _session?.token);
+    // A rejected token can't recover; send the user back to sign in rather
+    // than leave every screen failing.
+    _client.onUnauthorized = () {
+      if (_session?.token != null) logout();
+    };
   }
 
   final SessionStore? store;
