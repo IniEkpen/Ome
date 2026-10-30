@@ -241,6 +241,11 @@ class TransactionGraphBuilder {
       // Nodes stay where the layout puts them, so none can be dragged
       // out of the map; pinch and pan move the whole map instead.
       node.canDrag = false;
+      // No plough selection either: selecting rebuilds the node, and plough
+      // then re-measures it from its on-screen position, which is wrong once
+      // the map is zoomed or has moved, so its lines jump out of place. The
+      // map shows the tapped node's name itself instead.
+      node.canSelect = false;
 
       graph.addNode(node);
       nodes[id] = node;
@@ -284,31 +289,39 @@ class TransactionGraphBuilder {
       final isPath =
           highlightedEdges.contains(entry.key) && txs.any((t) => !t.isPrivate);
 
-      graph.addLink(
-        gv.GraphLink(
-          source: nodes[ends[0]]!,
-          target: nodes[ends[1]]!,
-          direction: gv.GraphLinkDirection.none,
-          properties: {
-            'color': isPath
-                ? const Color(0xFF16A085)
-                : txs.every((t) => t.isPrivate)
-                ? const Color(0xFF9D7BD8)
-                : Colors.blueGrey,
-            'weight': isPath ? 5.0 : (2 + txs.length).clamp(2, 10).toDouble(),
-            'totalAmount': txs.fold<double>(0, (sum, tx) => sum + tx.amount),
-            'transactionCount': txs.length,
-            'private': txs.every((t) => t.isPrivate),
-            // A link that touches the viewer is one of their own connections.
-            'direct': ends.contains(viewerId),
-            'lastActivity': txs
-                .map((t) => t.timestamp)
-                .reduce((a, b) => a.isAfter(b) ? a : b),
-            'history': txs,
-            'highlighted': isPath,
-          },
-        ),
-      );
+      final link =
+          gv.GraphLink(
+              source: nodes[ends[0]]!,
+              target: nodes[ends[1]]!,
+              direction: gv.GraphLinkDirection.none,
+              properties: {
+                'color': isPath
+                    ? const Color(0xFF16A085)
+                    : txs.every((t) => t.isPrivate)
+                    ? const Color(0xFF9D7BD8)
+                    : Colors.blueGrey,
+                'weight': isPath
+                    ? 5.0
+                    : (2 + txs.length).clamp(2, 10).toDouble(),
+                'totalAmount': txs.fold<double>(
+                  0,
+                  (sum, tx) => sum + tx.amount,
+                ),
+                'transactionCount': txs.length,
+                'private': txs.every((t) => t.isPrivate),
+                // A link that touches the viewer is one of their own connections.
+                'direct': ends.contains(viewerId),
+                'lastActivity': txs
+                    .map((t) => t.timestamp)
+                    .reduce((a, b) => a.isAfter(b) ? a : b),
+                'history': txs,
+                'highlighted': isPath,
+              },
+            )
+            ..canSelect = false
+            // Below the nodes (stack order -1), so lines never cross a name.
+            ..stackOrder = -2;
+      graph.addLink(link);
     }
 
     return graph;

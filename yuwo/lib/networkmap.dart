@@ -10,9 +10,12 @@ import 'theme/app_theme.dart';
 import 'widgets/common.dart';
 
 class Graph extends StatelessWidget {
-  const Graph({super.key, required this.graph});
+  const Graph({super.key, required this.graph, required this.namedNode});
 
   final gv.Graph graph;
+
+  /// Which node's name is showing; see [CustomBehavior.namedNode].
+  final ValueNotifier<Object?> namedNode;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +29,7 @@ class Graph extends StatelessWidget {
         return gv.GraphView(
           graph: graph,
           layoutStrategy: edgeAvoidingLayoutFor(graph, size),
-          behavior: const CustomBehavior(),
+          behavior: CustomBehavior(namedNode: namedNode),
         );
       },
     );
@@ -67,6 +70,13 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
 
   final searchController = TextEditingController();
 
+  final namedNode = ValueNotifier<Object?>(null);
+
+  // Bumped whenever new transactions are merged in.
+  int dataVersion = 0;
+  gv.Graph? _graph;
+  int? _graphKey;
+
   int searchVersion = 0;
   int requestVersion = 0;
 
@@ -87,6 +97,7 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
 
   // Add transactions returned by the backend.
   void _merge(NetworkPayload payload) {
+    dataVersion++;
     for (final party in payload.parties) {
       builder.addParty(party);
     }
@@ -254,9 +265,38 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
   @override
   void dispose() {
     searchController.dispose();
+    namedNode.dispose();
     animation.dispose();
     camera.dispose();
     super.dispose();
+  }
+
+  // The graph is rebuilt only when what it shows or the map's size changes,
+  // not on every setState (typing a search, a spinner), so the map doesn't
+  // re-lay out under the user. A new size needs a new layout, or nodes
+  // spill out of the map and their lines stay behind.
+  gv.Graph _visibleGraph(Size size) {
+    final key = Object.hash(
+      size,
+      dataVersion,
+      depth,
+      showMyPrivate,
+      Object.hashAllUnordered(extraIds),
+      Object.hashAll(path),
+    );
+    if (_graph != null && key == _graphKey) return _graph!;
+    _graphKey = key;
+    // plough measures a new graph's nodes from where they land on screen,
+    // so measure them un-zoomed or every line ends up out of place.
+    animation.stop();
+    camera.value = Matrix4.identity();
+    namedNode.value = null;
+    return _graph = builder.visibleGraph(
+      maxDepth: depth,
+      showMyPrivate: showMyPrivate,
+      extraIds: extraIds,
+      highlightedPath: path,
+    );
   }
 
   void _resetView() {
@@ -271,14 +311,10 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final visible = builder.visibleGraph(
-      maxDepth: depth,
-      showMyPrivate: showMyPrivate,
-      extraIds: extraIds,
-      highlightedPath: path,
-    );
-
     return Scaffold(
+      // The keyboard covers the map rather than squashing it, which would
+      // force a fresh layout while typing.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -378,139 +414,170 @@ class _NetworkState extends State<Network> with SingleTickerProviderStateMixin {
                 onChanged: _searchSuggestions,
               ),
 
-              if (suggestions.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: AppCard(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    radius: AppRadius.control,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 150),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: EdgeInsets.zero,
-                        itemCount: suggestions.length,
-                        separatorBuilder: (context, i) => const Divider(
-                          height: 1,
-                          indent: 52,
-                          endIndent: 12,
-                          color: AppColors.divider,
-                        ),
-                        itemBuilder: (context, i) {
-                          final party = suggestions[i];
-                          return ListTile(
-                            dense: true,
-                            visualDensity: VisualDensity.compact,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                            ),
-                            leading: NetworkAvatar(
-                              diameter: 30,
-                              image: party.image,
-                              initials: party.initials,
-                              ringColor: MapColors.node,
-                            ),
-                            title: Text(
-                              party.label,
-                              style: AppText.sectionTitle,
-                            ),
-                            trailing: const Icon(
-                              Icons.north_east,
-                              size: 14,
-                              color: AppColors.hint,
-                            ),
-                            onTap: () {
-                              searchController.text = party.label;
-
-                              _find(party);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-
-              if (message != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: AppColors.error,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        message!,
-                        style: AppText.caption.copyWith(color: AppColors.error),
-                      ),
-                    ],
-                  ),
-                ),
-
-              if (path.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _PathTrail(
-                    labels: [
-                      for (final id in path) builder.party(id)?.label ?? id,
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: AppSpacing.field),
-
-              // Zoomable transaction graph.
+              // Everything under the search box. Suggestions float over it
+              // so the map never moves or resizes while typing.
               Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    boxShadow: AppShadows.card,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    child: ColoredBox(
-                      color: MapColors.canvas,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Stack(
+                child: Stack(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (message != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Row(
                               children: [
-                                // minScale 1 keeps the map from shrinking
-                                // into a corner of the box; with no
-                                // boundary margin it can't be panned
-                                // past its edges either.
-                                Positioned.fill(
-                                  child: InteractiveViewer(
-                                    transformationController: camera,
-                                    minScale: 1,
-                                    maxScale: 3,
-                                    constrained: true,
-                                    child: Graph(graph: visible),
+                                const Icon(
+                                  Icons.info_outline,
+                                  size: 14,
+                                  color: AppColors.error,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  message!,
+                                  style: AppText.caption.copyWith(
+                                    color: AppColors.error,
                                   ),
                                 ),
-                                if (busy)
-                                  const Positioned(
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    child: LinearProgressIndicator(
-                                      minHeight: 2,
-                                      color: MapColors.node,
-                                      backgroundColor: Colors.transparent,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
-                          const _Legend(),
-                        ],
-                      ),
+
+                        if (path.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: _PathTrail(
+                              labels: [
+                                for (final id in path)
+                                  builder.party(id)?.label ?? id,
+                              ],
+                            ),
+                          ),
+
+                        const SizedBox(height: AppSpacing.field),
+
+                        // Zoomable transaction graph.
+                        Expanded(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.card,
+                              ),
+                              boxShadow: AppShadows.card,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.card,
+                              ),
+                              child: ColoredBox(
+                                color: MapColors.canvas,
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: Stack(
+                                        children: [
+                                          // minScale 1 keeps the map from shrinking
+                                          // into a corner of the box; with no
+                                          // boundary margin it can't be panned
+                                          // past its edges either.
+                                          Positioned.fill(
+                                            child: LayoutBuilder(
+                                              builder: (context, constraints) =>
+                                                  InteractiveViewer(
+                                                    transformationController:
+                                                        camera,
+                                                    minScale: 1,
+                                                    maxScale: 3,
+                                                    constrained: true,
+                                                    child: Graph(
+                                                      graph: _visibleGraph(
+                                                        constraints.biggest,
+                                                      ),
+                                                      namedNode: namedNode,
+                                                    ),
+                                                  ),
+                                            ),
+                                          ),
+                                          if (busy)
+                                            const Positioned(
+                                              top: 0,
+                                              left: 0,
+                                              right: 0,
+                                              child: LinearProgressIndicator(
+                                                minHeight: 2,
+                                                color: MapColors.node,
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const _Legend(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    if (suggestions.isNotEmpty)
+                      Positioned(
+                        top: 6,
+                        left: 0,
+                        right: 0,
+                        child: AppCard(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          radius: AppRadius.control,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 150),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              itemCount: suggestions.length,
+                              separatorBuilder: (context, i) => const Divider(
+                                height: 1,
+                                indent: 52,
+                                endIndent: 12,
+                                color: AppColors.divider,
+                              ),
+                              itemBuilder: (context, i) {
+                                final party = suggestions[i];
+                                return ListTile(
+                                  dense: true,
+                                  visualDensity: VisualDensity.compact,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  leading: NetworkAvatar(
+                                    diameter: 30,
+                                    image: party.image,
+                                    initials: party.initials,
+                                    ringColor: MapColors.node,
+                                  ),
+                                  title: Text(
+                                    party.label,
+                                    style: AppText.sectionTitle,
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.north_east,
+                                    size: 14,
+                                    color: AppColors.hint,
+                                  ),
+                                  onTap: () {
+                                    searchController.text = party.label;
+
+                                    _find(party);
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],

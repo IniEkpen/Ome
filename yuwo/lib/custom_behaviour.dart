@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:plough/plough.dart' as gv;
@@ -5,7 +6,18 @@ import 'adaptinglayout.dart';
 import 'theme/app_theme.dart';
 
 class CustomBehavior extends gv.GraphViewDefaultBehavior {
-  const CustomBehavior();
+  const CustomBehavior({required this.namedNode});
+
+  /// The id of the node whose name is showing, set by tapping it. Only the
+  /// name label listens, so a tap never rebuilds or moves the node itself.
+  final ValueNotifier<Object?> namedNode;
+
+  @override
+  void onTap(gv.GraphTapEvent event) {
+    final id = event.entityIds.firstOrNull;
+    // Tapping the same node again hides its name.
+    namedNode.value = namedNode.value == id ? null : id;
+  }
 
   @override
   gv.GraphNodeViewBehavior createNodeViewBehavior() {
@@ -48,9 +60,10 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
                 ? 'You'
                 : node.properties['label'] as String? ?? '',
             highlighted: highlighted,
-            // Tapping a node selects it, which shows the name on phones
-            // where there's no hover.
-            selected: node.isSelected,
+            // Tapping a node shows its name on phones, where there's no
+            // hover.
+            id: node.id,
+            namedNode: namedNode,
             // Path nodes shimmer; otherwise your own node breathes so it's
             // easy to find.
             avatar: highlighted || node.properties['viewer'] == true
@@ -183,20 +196,22 @@ class NetworkAvatar extends StatelessWidget {
 
 /// A node's avatar with its name, which hangs below without changing the
 /// node's size (so the layout and tap area stay the same). The name only
-/// shows while the node is hovered or selected.
+/// shows while the node is hovered or has been tapped.
 class _MapNode extends StatefulWidget {
   const _MapNode({
     required this.diameter,
     required this.name,
     required this.highlighted,
-    required this.selected,
+    required this.id,
+    required this.namedNode,
     required this.avatar,
   });
 
   final double diameter;
   final String name;
   final bool highlighted;
-  final bool selected;
+  final Object id;
+  final ValueListenable<Object?> namedNode;
   final Widget avatar;
 
   @override
@@ -224,21 +239,38 @@ class _MapNodeState extends State<_MapNode> {
             left: -widget.diameter,
             right: -widget.diameter,
             child: IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: widget.selected || _hovered ? 1 : 0,
-                duration: const Duration(milliseconds: 150),
-                child: Text(
-                  widget.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    height: 1,
-                    color: widget.highlighted
-                        ? MapColors.node
-                        : MapColors.node.withValues(alpha: 0.7),
+              child: ValueListenableBuilder(
+                valueListenable: widget.namedNode,
+                builder: (context, named, child) => AnimatedOpacity(
+                  opacity: named == widget.id || _hovered ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: child,
+                ),
+                // A white backing keeps the name readable over nearby lines.
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: MapColors.canvas,
+                      borderRadius: BorderRadius.circular(AppRadius.tile),
+                    ),
+                    child: Text(
+                      widget.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                        color: widget.highlighted
+                            ? MapColors.node
+                            : MapColors.node.withValues(alpha: 0.7),
+                      ),
+                    ),
                   ),
                 ),
               ),
