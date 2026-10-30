@@ -46,6 +46,10 @@ class ApiException implements Exception {
 
   bool get isCardRequired => code == 'card_required';
 
+  /// The card is fine but Stripe verification (onboarding) isn't finished.
+  bool get isPaymentVerificationRequired =>
+      code == 'payment_verification_required';
+
   @override
   String toString() => 'ApiException($statusCode, $code): $message';
 }

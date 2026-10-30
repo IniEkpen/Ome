@@ -72,6 +72,7 @@ class CardStatus {
     this.expMonth,
     this.expYear,
     this.payoutsEnabled = false,
+    this.paymentsVerified = false,
   });
 
   static const none = CardStatus(hasValidCard: false);
@@ -82,6 +83,10 @@ class CardStatus {
   final int? expMonth;
   final int? expYear;
   final bool payoutsEnabled;
+
+  /// Stripe onboarding is fully submitted and active, so this user can be
+  /// paid back when they host. Required (with a card) to create or join groups.
+  final bool paymentsVerified;
 
   String get label {
     if (last4 == null) return 'No card on file';
@@ -103,12 +108,14 @@ class CardStatus {
       expMonth: json['expMonth'] as int?,
       expYear: json['expYear'] as int?,
       payoutsEnabled: json['payoutsEnabled'] == true,
+      paymentsVerified: json['paymentsVerified'] == true,
     );
   }
 }
 
-/// Card on file + host payouts. Card details go straight from Stripe's sheet
-/// to Stripe; this app and our server only ever see ids and the last 4 digits.
+/// Card on file + payment verification (Stripe Connect). Card details go
+/// straight from Stripe's sheet to Stripe; this app and our server only ever
+/// see ids and the last 4 digits.
 class PaymentService {
   const PaymentService(this._auth);
 
@@ -156,12 +163,12 @@ class PaymentService {
     return CardStatus.fromJson(saved.json?['card'] as Map<String, dynamic>?);
   }
 
-  /// Client secret for Stripe Connect's embedded onboarding, so a host can
-  /// receive the money members pay them.
+  /// Client secret for Stripe Connect's embedded onboarding (payment
+  /// verification), so the user can be paid back when they host.
   Future<String> connectOnboardingSecret() async {
     final response = (await _auth.client.post(
       '/payments/connect/account-session',
-    )).orThrow("We couldn't start payout setup.");
+    )).orThrow("We couldn't start payment verification.");
     return response.json!['clientSecret'] as String;
   }
 }

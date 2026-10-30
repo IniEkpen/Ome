@@ -13,12 +13,21 @@ import 'package:yuwo/theme/app_theme.dart';
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  Future<List<http.Request>> pumpGroups(WidgetTester tester) async {
+  Future<List<http.Request>> pumpGroups(
+    WidgetTester tester, {
+    String? createErrorCode,
+  }) async {
     final requests = <http.Request>[];
     final auth = AuthService(
       client: ApiClient(
         httpClient: MockClient((request) async {
           requests.add(request);
+          if (request.method == 'POST' && createErrorCode != null) {
+            return http.Response(
+              jsonEncode({'error': 'Not set up', 'code': createErrorCode}),
+              402,
+            );
+          }
           if (request.method == 'POST') {
             return http.Response(
               jsonEncode({'groupId': 1, 'invited': [], 'notFound': []}),
@@ -95,5 +104,29 @@ void main() {
     });
     expect(find.text('Create a Group'), findsNothing, reason: 'sheet closes');
     expect(find.text('Group "Dinner" created. Invites sent.'), findsOneWidget);
+  });
+
+  testWidgets('creating without payment verification asks the user to verify', (
+    tester,
+  ) async {
+    final requests = await pumpGroups(
+      tester,
+      createErrorCode: 'payment_verification_required',
+    );
+    await tester.tap(find.byTooltip('Create group'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), 'Dinner');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create Group'));
+    // The button's spinner keeps animating while the dialog is up, so the
+    // frames never settle; pump a fixed time instead.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Verify your payment details'), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+
+    expect(requests.where((r) => r.method == 'POST'), hasLength(1));
+    expect(find.text('Create a Group'), findsOneWidget, reason: 'stays open');
   });
 }

@@ -17,7 +17,7 @@
 // update their details only through Stripe's embedded component inside the app.
 const config = require('../config')
 const { getStripe, isStripeConfigured } = require('./stripeClient')
-const { profile } = require('../models/Profile')
+const { profile, Profile } = require('../models/Profile')
 const { split: Split } = require('../models/Split')
 const { divideEvenly } = require('./splitCalculator')
 const { pool } = require('../db')
@@ -77,6 +77,12 @@ async function saveCardFromSetupIntent(setupIntentId, expectedCustomerId) {
 
 const ACCOUNT_INCLUDE = ['configuration.recipient', 'requirements']
 
+// Every user is onboarded for the same reason, so onboarding doesn't ask
+// them to describe their "business". Stripe uses it for risk review only.
+const PRODUCT_DESCRIPTION = 'Personal account on Yuwo, an app for splitting shared bills '
+    + '(meals, trips, household costs) with friends. Receives reimbursements from group '
+    + 'members for expenses paid upfront. No goods or services are sold.'
+
 async function ensureConnectAccount(user) {
     if (user.stripe_connect_account_id) return user.stripe_connect_account_id
     const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username
@@ -96,6 +102,7 @@ async function ensureConnectAccount(user) {
         defaults: {
             currency: config.stripe.currency,
             locales: ['en-US'],
+            profile: { product_description: PRODUCT_DESCRIPTION },
             responsibilities: { fees_collector: 'application', losses_collector: 'application' },
         },
         metadata: { user_id: String(user.id) },
@@ -112,7 +119,9 @@ function connectStatusFrom(account) {
     return {
         transfersStatus: balance?.stripe_transfers?.status || null,
         payoutsStatus: balance?.payouts?.status || null,
-        requirementsDue: entries.some((entry) => entry.awaiting_action_from === 'user'),
+        // Only what Stripe needs now; 'eventually_due' items aren't asked for yet.
+        requirementsDue: entries.some((entry) => entry.awaiting_action_from === 'user'
+            && entry.minimum_deadline?.status !== 'eventually_due'),
     }
 }
 
@@ -130,6 +139,21 @@ async function syncConnectAccount(accountId) {
     return applyConnectStatus(account)
 }
 
+// Re-reads the user's account status from Stripe until they're verified, so a
+// just-finished onboarding counts even when the accounts webhook isn't set up.
+// Returns the user row, refreshed when anything was synced.
+async function refreshConnectStatus(user, { always = false } = {}) {
+    if (!user.stripe_connect_account_id || !isStripeConfigured()) return user
+    if (Profile.HasVerifiedPayouts(user) && !always) return user
+    try {
+        await syncConnectAccount(user.stripe_connect_account_id)
+    } catch (error) {
+        console.error('Refreshing payout status failed:', error.code || error.message)
+        return user
+    }
+    return (await profile.GetProfileById(user.id)) || user
+}
+
 // Stripe's embedded onboarding inside the app (flutter_stripe_connect). Hosts
 // also come back through it to fix or update details and bank accounts.
 async function createConnectAccountSession(user) {
@@ -138,6 +162,12 @@ async function createConnectAccountSession(user) {
     // Stripe only allows skipping its sign-in popup when the platform collects
     // requirements; checked rather than assumed, since Stripe derives it.
     const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ['defaults'] })
+    // Accounts made before the description was prefilled get it now.
+    if (!account.defaults?.profile?.product_description) {
+        await stripe.v2.core.accounts.update(accountId, {
+            defaults: { profile: { product_description: PRODUCT_DESCRIPTION } },
+        })
+    }
     const platformCollects = account.defaults?.responsibilities?.requirements_collector === 'application'
     const features = {
         external_account_collection: true,
@@ -486,6 +516,7 @@ module.exports = {
     saveCardFromSetupIntent,
     createConnectAccountSession,
     syncConnectAccount,
+    refreshConnectStatus,
     chargeSplit,
     handlePaymentSucceeded,
     handlePaymentFailed,

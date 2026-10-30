@@ -5,10 +5,12 @@ import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/payment_service.dart';
 
-/// Stripe Connect onboarding for hosts, so the money members pay a host can
-/// be paid out to them. Stripe's embedded component runs inside the app (no
-/// browser); hosts come back here to update details or bank accounts. The
-/// client secret comes from our server; only the publishable key lives in the app.
+/// Payment verification: Stripe Connect onboarding. Anyone can host a bill,
+/// so everyone completes it before creating or joining a group; it's how the
+/// money members pay a host reaches the host's bank. Stripe's embedded
+/// component runs inside the app (no browser); users come back here to update
+/// details or bank accounts. The client secret comes from our server; only
+/// the publishable key lives in the app.
 class Pay extends StatefulWidget {
   const Pay({super.key});
   @override
@@ -29,7 +31,10 @@ class _Payment extends State<Pay> {
     await StripeConfig.ready();
     if (!mounted) return;
     if (!StripeConfig.isConfigured) {
-      setState(() => _error = "Payouts aren't available in this build yet.");
+      setState(
+        () =>
+            _error = "Payment verification isn't available in this build yet.",
+      );
       return;
     }
     final payments = PaymentService(AuthScope.read(context));
@@ -43,14 +48,16 @@ class _Payment extends State<Pay> {
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (mounted) setState(() => _error = "Couldn't start payout setup.");
+      if (mounted) {
+        setState(() => _error = "Couldn't start payment verification.");
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Payouts')),
+      appBar: AppBar(title: const Text('Payment verification')),
       body: _error != null
           ? Center(child: Text(_error!))
           : !_isStripeReady
@@ -59,11 +66,13 @@ class _Payment extends State<Pay> {
               onLoaded: () => debugPrint('Onboarding loaded'),
               onLoadError: (error) {
                 if (mounted) {
-                  setState(() => _error = "Couldn't load payout setup.");
+                  setState(
+                    () => _error = "Couldn't load payment verification.",
+                  );
                 }
               },
-              // The host finished or closed onboarding; the profile page
-              // reloads their payout status when this screen closes.
+              // Finished or closed onboarding; whoever opened this screen
+              // reloads the verification status when it closes.
               onExit: () {
                 if (mounted) Navigator.of(context).maybePop();
               },
