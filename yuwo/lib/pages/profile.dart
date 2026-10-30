@@ -240,8 +240,11 @@ class _PaymentCardState extends State<_PaymentCard> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const Pay()));
-    // Onboarding may have just finished; show the new status.
-    if (mounted) setState(() => _status = _payments.cardStatus());
+    // Onboarding may have just finished; keep checking until Stripe has
+    // activated the account so the tick appears.
+    if (mounted) {
+      setState(() => _status = _payments.statusAfterVerification());
+    }
   }
 
   @override

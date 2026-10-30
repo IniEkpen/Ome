@@ -74,7 +74,9 @@ Future<bool> ensurePaymentVerification(BuildContext context) async {
   ).push(MaterialPageRoute(builder: (_) => const Pay()));
   if (!context.mounted) return false;
   try {
-    final status = await PaymentService(AuthScope.read(context)).cardStatus();
+    final status = await PaymentService(
+      AuthScope.read(context),
+    ).statusAfterVerification();
     if (!status.paymentsVerified && context.mounted) {
       showMessage(
         context,
