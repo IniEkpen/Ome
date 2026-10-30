@@ -175,21 +175,10 @@ class NetworkAvatar extends StatelessWidget {
     if (source == null || source.isEmpty) return initialsFace();
     Widget onError(BuildContext context, Object error, StackTrace? stack) =>
         initialsFace();
-    // Photos show in black and white so they sit with the black nodes.
-    return ColorFiltered(
-      colorFilter: _greyscale,
-      child: source.startsWith('http')
-          ? Image.network(source, fit: BoxFit.cover, errorBuilder: onError)
-          : Image.asset(source, fit: BoxFit.cover, errorBuilder: onError),
-    );
+    return source.startsWith('http')
+        ? Image.network(source, fit: BoxFit.cover, errorBuilder: onError)
+        : Image.asset(source, fit: BoxFit.cover, errorBuilder: onError);
   }
-
-  static const _greyscale = ColorFilter.matrix(<double>[
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0, 0, 0, 1, 0,
-  ]);
 }
 
 /// A node's avatar with its name, which hangs below without changing the
