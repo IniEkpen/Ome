@@ -55,6 +55,7 @@ async function deleteAccount(userId) {
             await client.query('UPDATE groups SET created_by_user = $2 WHERE id = $1', [groupId, heir.rows[0].user_id])
         }
         await client.query('DELETE FROM groupmembers WHERE user_id = $1', [userId])
+        await client.query('DELETE FROM notifications WHERE user_id = $1', [userId])
         await profile.Scrub(client, userId)
         return user.rows[0]
     })

@@ -12,6 +12,7 @@ const { HttpError } = require('../auth')
 const { profile, Profile } = require('../models/Profile')
 const { getStripe, isStripeConfigured } = require('./stripeClient')
 const payments = require('./paymentService')
+const { notify } = require('./notifyService')
 
 const MIN_CENTS = 100
 const MAX_CENTS = 100_000
@@ -142,6 +143,10 @@ async function refundPayment(userId, paymentId) {
     await payments.refundIntent(payment.stripe_payment_intent_id,
         { direct_payment_id: String(payment.id), refunded_by: String(userId) })
     const after = await pool.query('SELECT * FROM direct_payments WHERE id = $1', [paymentId])
+    await notify(payment.payer_id, {
+        kind: 'payback_refunded', key: `refund:${payment.id}`, actorId: userId,
+        directPaymentId: payment.id, amountCents: payment.amount_cents, label: payment.note,
+    })
     return toJson(after.rows[0])
 }
 

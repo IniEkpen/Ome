@@ -492,3 +492,33 @@ CREATE TABLE IF NOT EXISTS stripe_webhook_events (
     -- Null until the handler finishes, so a failed attempt is retried.
     processed_at  TIMESTAMPTZ
 );
+
+
+-- ---------------------------------------------------------------------------
+-- notifications: the in-app inbox (bell on Home)
+-- ---------------------------------------------------------------------------
+-- What happened and who did it, not finished text: the wording is built when
+-- read (services/notifyService.js), so renamed or deleted people show right.
+-- Delivered live over GET /users/me/events while the app is open.
+CREATE TABLE IF NOT EXISTS notifications (
+    id                 BIGSERIAL PRIMARY KEY,
+    user_id            INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind               VARCHAR(32) NOT NULL
+                       CHECK (kind IN ('bill_opened', 'bill_cancelled', 'share_charged', 'share_declined',
+                                       'paid_you', 'payback_received', 'payback_refunded', 'group_invite')),
+    actor_id           INT REFERENCES users(id) ON DELETE SET NULL,
+    group_id           INT REFERENCES groups(id) ON DELETE SET NULL,
+    split_id           INT REFERENCES splits(id) ON DELETE SET NULL,
+    direct_payment_id  INT REFERENCES direct_payments(id) ON DELETE SET NULL,
+    amount_cents       INT,
+    -- The bill title or pay-back note when it happened (kept if the bill goes).
+    label              VARCHAR(255),
+    -- Webhooks and retries repeat events; one notification per event.
+    dedupe_key         VARCHAR(128) NOT NULL,
+    read_at            TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, dedupe_key)
+);
+
+CREATE INDEX IF NOT EXISTS notifications_inbox ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread ON notifications (user_id) WHERE read_at IS NULL;

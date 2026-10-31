@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/home_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
 import 'home_data.dart';
+import 'notifications.dart';
 import 'pay_back.dart';
 import 'payment_history.dart';
 
@@ -111,6 +113,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: YuwoAppBar(
         actions: [
+          const _Bell(),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: IconButton.filled(
@@ -477,5 +480,26 @@ class _ActivityRow extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays == 1) return 'Yesterday';
     return '${diff.inDays} days ago';
+  }
+}
+
+/// Opens the in-app inbox; the badge counts unread notifications.
+class _Bell extends StatelessWidget {
+  const _Bell();
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = NotificationScope.maybeOf(context)?.unreadCount ?? 0;
+    return IconButton(
+      tooltip: unread == 0 ? 'Notifications' : 'Notifications, $unread unread',
+      onPressed: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
+      icon: Badge(
+        isLabelVisible: unread > 0,
+        label: Text(unread > 99 ? '99+' : '$unread'),
+        child: const Icon(Icons.notifications_none),
+      ),
+    );
   }
 }

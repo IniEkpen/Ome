@@ -23,6 +23,7 @@ const { divideEvenly } = require('./splitCalculator')
 const { pool } = require('../db')
 const { HttpError } = require('../auth')
 const cards = require('./cardService')
+const { notify } = require('./notifyService')
 
 async function ensureCustomer(user) {
     if (user.stripe_customer_id) return user.stripe_customer_id
@@ -208,6 +209,7 @@ async function chargeSplit(splitId, attempt = 'initial') {
     for (const payer of payers) {
         if (!payer.stripe_customer_id || !payer.default_payment_method_id) {
             await Split.SetPaymentStatus(splitId, payer.user_id, 'failed')
+            await notifyDeclined(splitId, payer.user_id, `declined:${splitId}-${payer.user_id}-${attempt}`)
             continue
         }
         if (payer.currency !== config.stripe.currency) {
@@ -242,6 +244,7 @@ async function chargeSplit(splitId, attempt = 'initial') {
             const reason = error.decline_code || error.code
             console.error(`Charge failed for split ${splitId}, user ${payer.user_id}:`, reason || error.message)
             await Split.SetPaymentStatus(splitId, payer.user_id, status, intentId, reason)
+            await notifyDeclined(splitId, payer.user_id, `declined:${intentId || `${splitId}-${payer.user_id}-${attempt}`}`)
         }
     }
     await Split.SettleIfComplete(splitId)
@@ -264,7 +267,22 @@ async function handlePaymentSucceeded(intent) {
     await Split.SetPaymentStatus(splitId, userId, 'succeeded', intent.id)
     await payoutToHosts(splitId, userId, intent)
     await Split.SettleIfComplete(splitId)
+    await notify(userId, {
+        kind: 'share_charged', key: `charged:${intent.id}`, splitId, groupId: await groupOf(splitId),
+        amountCents: intent.amount_received ?? intent.amount,
+    })
     return splitId
+}
+
+async function groupOf(splitId) {
+    const { rows } = await pool.query('SELECT group_id FROM splits WHERE id = $1', [splitId])
+    return rows[0]?.group_id ?? null
+}
+
+// A member's card was declined (or needs their bank's approval): tell them,
+// so they can pick another card for the host to retry.
+async function notifyDeclined(splitId, userId, key) {
+    await notify(userId, { kind: 'share_declined', key, splitId, groupId: await groupOf(splitId) })
 }
 
 async function handlePaymentFailed(intent, status = 'failed') {
@@ -281,6 +299,7 @@ async function handlePaymentFailed(intent, status = 'failed') {
     if (!splitId || !userId) return null
     const error = intent.last_payment_error
     await Split.SetPaymentStatus(splitId, userId, status, intent.id, error?.decline_code || error?.code)
+    await notifyDeclined(splitId, userId, `declined:${intent.id}`)
     return splitId
 }
 
@@ -316,6 +335,10 @@ async function handleDirectPaymentSucceeded(intent) {
          ON CONFLICT (source_payment_intent_id, host_user_id) DO NOTHING RETURNING id`,
         [payment.id, payment.recipient_id, intent.id, intent.amount_received ?? payment.amount_cents])
     if (inserted.rows[0]) await sendPayout(inserted.rows[0].id)
+    await notify(payment.recipient_id, {
+        kind: 'payback_received', key: `payback:${payment.id}`, actorId: payment.payer_id,
+        directPaymentId: payment.id, amountCents: payment.amount_cents, label: payment.note,
+    })
 }
 
 // Co-hosts share each incoming payment evenly.
@@ -323,8 +346,13 @@ async function payoutToHosts(splitId, payerId, intent) {
     const hosts = await Split.Hosts(splitId)
     const amount = intent.amount_received ?? intent.amount
     const shares = divideEvenly(amount, hosts.map((h) => h.id))
+    const groupId = await groupOf(splitId)
     for (const host of hosts) {
         await recordTransaction(splitId, payerId, host.id, shares.get(host.id), intent.id)
+        await notify(host.id, {
+            kind: 'paid_you', key: `paid_you:${intent.id}`, actorId: payerId, splitId, groupId,
+            amountCents: shares.get(host.id),
+        })
         const inserted = await pool.query(
             `INSERT INTO split_payouts (split_id, host_user_id, source_payment_intent_id, amount_cents)
              VALUES ($1, $2, $3, $4)
