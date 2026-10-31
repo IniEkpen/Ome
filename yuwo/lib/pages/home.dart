@@ -8,6 +8,7 @@ import '../utils/money.dart';
 import '../widgets/common.dart';
 import 'home_data.dart';
 import 'pay_back.dart';
+import 'payment_history.dart';
 
 /// The Home tab: loads the signed-in user's bills and activity from the API.
 /// Dev sessions the server didn't issue a token for get sample data instead.
@@ -106,7 +107,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final home = data ?? HomeData.mock();
     final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
-    final body = _body(home, open);
+    final body = _body(context, home, open);
     return Scaffold(
       appBar: YuwoAppBar(
         actions: [
@@ -130,7 +131,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _body(HomeData home, List<HomeBill> open) {
+  Widget _body(BuildContext context, HomeData home, List<HomeBill> open) {
     return PageBody(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,9 +168,22 @@ class HomePage extends StatelessWidget {
               ),
             ),
           const SizedBox(height: AppSpacing.section),
-          const SectionHeader(
-            'Recent Activity',
-            subtitle: 'Payments and changes across your groups',
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Expanded(
+                child: SectionHeader(
+                  'Recent Activity',
+                  subtitle: 'Payments and changes across your groups',
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaymentHistoryPage()),
+                ),
+                child: const Text('All payments'),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.field),
           _ActivityList(activity: home.activity),

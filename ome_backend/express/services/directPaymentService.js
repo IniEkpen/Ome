@@ -123,4 +123,26 @@ async function sendPayment(payerId, body) {
     return toJson(rows[0], recipient)
 }
 
-module.exports = { sendPayment, MIN_CENTS, MAX_CENTS, DAILY_CENTS }
+// The recipient gives a payment back in full (e.g. they were paid twice).
+// The payer can't refund their own payment; their bank handles that.
+async function refundPayment(userId, paymentId) {
+    const { rows } = await pool.query('SELECT * FROM direct_payments WHERE id = $1', [paymentId])
+    const payment = rows[0]
+    // Same answer whether it doesn't exist or isn't theirs.
+    if (!payment || payment.recipient_id !== userId) {
+        throw new HttpError(404, "We couldn't find that payment.", 'not_found')
+    }
+    if (payment.status === 'refunded') throw new HttpError(409, 'That payment was already refunded.', 'already_refunded')
+    if (payment.status === 'disputed') {
+        throw new HttpError(409, "That payment is being disputed with the bank, so it can't be refunded here.",
+            'not_refundable')
+    }
+    if (payment.status !== 'succeeded') throw new HttpError(409, 'Only a completed payment can be refunded.', 'not_refundable')
+    if (!isStripeConfigured()) throw new HttpError(503, 'Payments are not set up yet.', 'payments_unavailable')
+    await payments.refundIntent(payment.stripe_payment_intent_id,
+        { direct_payment_id: String(payment.id), refunded_by: String(userId) })
+    const after = await pool.query('SELECT * FROM direct_payments WHERE id = $1', [paymentId])
+    return toJson(after.rows[0])
+}
+
+module.exports = { sendPayment, refundPayment, MIN_CENTS, MAX_CENTS, DAILY_CENTS }

@@ -19,6 +19,67 @@ class Payee {
   String get displayName => name ?? username;
 }
 
+/// One payment in your history: a bill payment or a pay-back, in or out.
+class HistoryItem {
+  const HistoryItem({
+    required this.kind,
+    required this.id,
+    required this.incoming,
+    required this.otherUsername,
+    required this.amountCents,
+    required this.status,
+    required this.at,
+    this.note,
+    this.groupName,
+    this.canRefund = false,
+  });
+
+  factory HistoryItem.fromJson(Map<String, dynamic> json) => HistoryItem(
+    kind: json['kind'] as String,
+    id: (json['id'] as num).toInt(),
+    incoming: json['direction'] == 'in',
+    otherUsername:
+        (json['other'] as Map<String, dynamic>)['username'] as String,
+    amountCents: (json['amountCents'] as num).toInt(),
+    status: json['status'] as String,
+    at: DateTime.parse(json['at'] as String).toLocal(),
+    note: json['note'] as String?,
+    groupName: json['groupName'] as String?,
+    canRefund: json['canRefund'] == true,
+  );
+
+  /// 'bill' or 'payback'.
+  final String kind;
+  final int id;
+  final bool incoming;
+  final String otherUsername;
+  final int amountCents;
+
+  /// succeeded, processing, requires_action, failed, refunded or disputed.
+  final String status;
+  final DateTime at;
+  final String? note;
+  final String? groupName;
+
+  /// You received this pay-back and can give it back.
+  final bool canRefund;
+
+  String get title =>
+      incoming ? '$otherUsername paid you' : 'You paid $otherUsername';
+
+  /// What it was for, and where: "Concert tickets", "Pizza night · Book Club".
+  String get detail => [note, groupName].whereType<String>().join(' · ');
+}
+
+class HistoryPage {
+  const HistoryPage(this.items, this.nextBefore);
+
+  final List<HistoryItem> items;
+
+  /// Pass to [PayBackService.history] for the next page; null at the end.
+  final String? nextBefore;
+}
+
 /// "Pay back": pay one person for a stated expense, outside any group.
 /// Limits (also enforced by the server): $1 to $1,000 per payment, $2,000 a
 /// day, and a note saying what it's for.
@@ -66,6 +127,27 @@ class PayBackService {
         'idempotencyKey': idempotencyKey,
       },
     )).orThrow("We couldn't send that payment. Please try again.");
+  }
+
+  /// Every payment in or out, newest first, a page at a time.
+  Future<HistoryPage> history({String? before}) async {
+    final response = (await _auth.client.get(
+      '/payments/history',
+      query: {'before': ?before},
+    )).orThrow("Couldn't load your payments.");
+    final json = response.json ?? const {};
+    final items = json['items'];
+    return HistoryPage([
+      for (final item in items is List ? items : const [])
+        if (item is Map<String, dynamic>) HistoryItem.fromJson(item),
+    ], json['nextBefore'] as String?);
+  }
+
+  /// Gives a pay-back you received back to the payer, in full.
+  Future<void> refund(int paymentId) async {
+    (await _auth.client.post(
+      '/payments/direct/$paymentId/refund',
+    )).orThrow("We couldn't refund that payment.");
   }
 
   static String newIdempotencyKey() {

@@ -478,20 +478,27 @@ async function refundPayment(splitId, payerUserId) {
     if (!participant?.stripe_payment_intent_id || participant.payment_status !== 'succeeded') {
         throw new HttpError(409, 'Only a completed payment can be refunded.', 'not_refundable')
     }
-    const intentId = participant.stripe_payment_intent_id
+    await refundIntent(participant.stripe_payment_intent_id,
+        { split_id: String(splitId), user_id: String(payerUserId) })
+    return splitId
+}
+
+// Refunds one payment in full. What was sent on to the recipient is pulled
+// back first; if that fails (already moved to their bank) nothing is refunded
+// and the platform decides in the Stripe Dashboard.
+async function refundIntent(intentId, metadata) {
     const unrecovered = await reverseHostPayouts(intentId, 'refund')
     if (unrecovered.length > 0) {
         throw new HttpError(409,
-            "This payment was already paid out to the host's bank, so it can't be refunded in the app. Contact support.",
+            "This payment was already paid out to the recipient's bank, so it can't be refunded in the app. Contact support.",
             'refund_needs_support')
     }
     await getStripe().refunds.create({
         payment_intent: intentId,
         reason: 'requested_by_customer',
-        metadata: { split_id: String(splitId), user_id: String(payerUserId) },
+        metadata,
     }, { idempotencyKey: `refund-${intentId}` })
     await markRefunded(intentId)
-    return splitId
 }
 
 // Also covers refunds made from the Stripe Dashboard.
@@ -581,6 +588,7 @@ module.exports = {
     handleChargeRefunded,
     handleDispute,
     refundPayment,
+    refundIntent,
     releasePendingPayouts,
     beginWebhookEvent,
     finishWebhookEvent,

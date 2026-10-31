@@ -7,6 +7,7 @@ const { getStripe, isStripeConfigured } = require('../services/stripeClient')
 const payments = require('../services/paymentService')
 const splits = require('../services/splitService')
 const direct = require('../services/directPaymentService')
+const history = require('../services/historyService')
 
 // Stripe signs each endpoint with its own secret; the platform endpoint and a
 // Connect endpoint may both point here, so any configured secret is accepted.
@@ -136,6 +137,18 @@ router.post('/direct', async (req, res) => {
             'authentication_required')
     }
     return res.status(201).json({ payment })
+})
+
+// Only the person who received a pay-back can refund it, in full.
+router.post('/direct/:paymentId/refund', async (req, res) => {
+    const paymentId = Number(req.params.paymentId)
+    if (!Number.isInteger(paymentId) || paymentId <= 0) throw new HttpError(400, 'Invalid id.', 'invalid_id')
+    return res.json({ payment: await direct.refundPayment(req.user.id, paymentId) })
+})
+
+// Every payment in or out, newest first. Pass ?before=<nextBefore> for more.
+router.get('/history', async (req, res) => {
+    return res.json(await history.history(req.user.id, { before: req.query.before, limit: req.query.limit }))
 })
 
 router.get('/card', async (req, res) => {

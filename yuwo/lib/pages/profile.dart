@@ -7,6 +7,7 @@ import '../services/payment_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import 'payment_history.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -183,6 +184,14 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: AppSpacing.field),
               const _PaymentCard(),
+              const SizedBox(height: AppSpacing.field),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.receipt_long),
+                label: const Text('Payment history'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaymentHistoryPage()),
+                ),
+              ),
               const SizedBox(height: AppSpacing.section),
               OutlinedButton(
                 onPressed: () => _logout(context),
