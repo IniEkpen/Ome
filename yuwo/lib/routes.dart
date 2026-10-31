@@ -88,6 +88,9 @@ class NetworkTab extends StatelessWidget {
     if (auth.session?.token == null || userId == null) {
       return Network(viewerId: 'me', repository: FakeNetworkRepository());
     }
-    return Network(viewerId: '$userId', repository: ApiNetworkRepository(auth));
+    return Network(
+      viewerId: '$userId',
+      repository: ApiNetworkRepository(auth),
+    );
   }
 }

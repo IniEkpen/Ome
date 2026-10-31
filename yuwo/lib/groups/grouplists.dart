@@ -164,14 +164,10 @@ class _MemberStack extends StatelessWidget {
                 backgroundColor: AppColors.textPrimary,
                 child: CircleAvatar(
                   radius: size / 2 - 2,
-                  backgroundColor: AppColors
-                      .groupCards[i % AppColors.groupCards.length]
-                      .first,
+                  backgroundColor: AppColors.groupCards[i % AppColors.groupCards.length].first,
                   child: Text(
                     shown[i].isEmpty ? "?" : shown[i][0].toUpperCase(),
-                    style: AppText.sectionTitle.copyWith(
-                      color: AppColors.surface,
-                    ),
+                    style: AppText.sectionTitle.copyWith(color: AppColors.surface),
                   ),
                 ),
               ),

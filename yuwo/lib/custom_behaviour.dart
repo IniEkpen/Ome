@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:plough/plough.dart' as gv;
@@ -10,27 +11,37 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
   @override
   gv.GraphNodeViewBehavior createNodeViewBehavior() {
     return gv.GraphNodeViewBehavior.defaultBehavior(
-      nodeRendererBuilder: (context, graph, node, child) {
-        final diameter = nodeDiameterFor(graph.nodes.length);
+      nodeRendererBuilder: (
+        context,
+        graph,
+        node,
+        child,
+      ) {
+        final diameter =
+            nodeDiameterFor(graph.nodes.length);
 
-        final highlighted = node.properties['highlighted'] == true;
+        final highlighted =
+            node.properties['highlighted'] == true;
 
         final ringColor = highlighted
             ? AppColors.path
-            : (node.properties['color'] as Color? ?? Colors.blueGrey);
+            : (node.properties['color'] as Color? ??
+                Colors.blueGrey);
 
         // The default renderer only supplies the hit area and selection
         // state; the avatar draws everything visible.
         return gv.GraphDefaultNodeRenderer(
           node: node,
           style: gv.GraphDefaultNodeRendererStyle(
-            shape: gv.GraphDefaultNodeRendererShape.circle,
+            shape:
+                gv.GraphDefaultNodeRendererShape.circle,
             height: diameter,
             width: diameter,
             color: Colors.transparent,
             borderWidth: 0,
             borderColor: Colors.transparent,
-            selectedBorderColor: ringColor.withValues(alpha: 0.5),
+            selectedBorderColor:
+                ringColor.withValues(alpha: 0.5),
             padding: EdgeInsets.zero,
           ),
           child: NetworkAvatar(
@@ -48,25 +59,33 @@ class CustomBehavior extends gv.GraphViewDefaultBehavior {
   @override
   gv.GraphLinkViewBehavior createLinkViewBehavior() {
     return gv.GraphLinkViewBehavior(
-      builder:
-          (context, graph, link, sourceView, targetView, routing, geometry, _) {
-            final highlighted = link.properties['highlighted'] == true;
-            final color = link.properties['color'] as Color? ?? Colors.blueGrey;
-            final weight = (link.properties['weight'] as num? ?? 2).toDouble();
+      builder: (
+        context,
+        graph,
+        link,
+        sourceView,
+        targetView,
+        routing,
+        geometry,
+        _,
+      ) {
+        final highlighted = link.properties['highlighted'] == true;
+        final color = link.properties['color'] as Color? ?? Colors.blueGrey;
+        final weight = (link.properties['weight'] as num? ?? 2).toDouble();
 
-            return gv.GraphDefaultLinkRenderer(
-              link: link,
-              sourceView: sourceView,
-              targetView: targetView,
-              routing: routing,
-              geometry: geometry,
-              thickness: 20,
-              // weight is 2-10 (more transactions = thicker); scale it down so
-              // busy pairs stand out without lines dwarfing the small nodes.
-              lineWidth: highlighted ? 3 : 1 + weight * 0.25,
-              color: highlighted ? color : color.withValues(alpha: 0.45),
-            );
-          },
+        return gv.GraphDefaultLinkRenderer(
+          link: link,
+          sourceView: sourceView,
+          targetView: targetView,
+          routing: routing,
+          geometry: geometry,
+          thickness: 20,
+          // weight is 2-10 (more transactions = thicker); scale it down so
+          // busy pairs stand out without lines dwarfing the small nodes.
+          lineWidth: highlighted ? 3 : 1 + weight * 0.25,
+          color: highlighted ? color : color.withValues(alpha: 0.45),
+        );
+      },
     );
   }
 }

@@ -94,6 +94,8 @@ class FakeNetworkRepository implements NetworkRepository {
   }
 
   @override
-  Future<NetworkPayload> loadMyPrivateTransactions() async =>
-      NetworkPayload(parties: _parties, transactions: _records((t) => t.$5));
+  Future<NetworkPayload> loadMyPrivateTransactions() async => NetworkPayload(
+    parties: _parties,
+    transactions: _records((t) => t.$5),
+  );
 }

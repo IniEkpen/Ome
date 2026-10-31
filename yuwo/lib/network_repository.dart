@@ -1,7 +1,9 @@
+
 import 'transactiongraph.dart';
 
-//used when calling from backend
+//used when calling from backend 
 abstract class NetworkRepository {
+
   // Load public transactions within a selected layer
   Future<NetworkPayload> loadLayer({
     required String viewerId,
