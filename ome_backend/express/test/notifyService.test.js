@@ -15,6 +15,7 @@ test('each kind reads naturally and says where tapping goes', () => {
         share_declined: ['Your card was declined for The Tack Room', 'Open the bill to pick another card', 'group'],
         paid_you: ['ada paid you $40.36', 'The Tack Room · Dinner', 'payments'],
         group_invite: ['ada invited you to Dinner', 'Accept or decline in Groups', 'groups'],
+        item_assigned: ['ada added The Tack Room to your share', '$40.36 · Dinner', 'group'],
     }
     for (const [kind, [title, body, target]] of Object.entries(cases)) {
         const n = describeRow(row({ kind }))

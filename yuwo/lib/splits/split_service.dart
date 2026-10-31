@@ -75,6 +75,20 @@ class SplitService {
 
   // Host only from here down.
 
+  /// Puts an item on someone's share, or takes it off ([claimed] false).
+  Future<SplitBill?> assignItem(
+    int splitId,
+    int itemId,
+    int userId, {
+    bool claimed = true,
+  }) async => _split(
+    await _auth.client.put(
+      '/splits/$splitId/items/$itemId/assign',
+      body: {'userId': userId, 'claimed': claimed},
+    ),
+    "Couldn't assign that item.",
+  );
+
   Future<SplitBill?> setMode(int splitId, SplitMode mode) async => _split(
     await _auth.client.put('/splits/$splitId/mode', body: {'mode': mode.wire}),
     "Couldn't change how the bill is split.",

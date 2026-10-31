@@ -243,7 +243,34 @@ async function chooseCard(user, splitId, paymentMethodId) {
     return broadcast(splitId)
 }
 
+// A host puts an item on someone's share (or takes it off), e.g. from the
+// roulette in the bill popup. Adding someone to an item others already have
+// makes it shared, the same as if they'd claimed it themselves.
+async function assignItem(user, splitId, itemId, targetUserId, claimed) {
+    let item
+    await changeOpenSplit(user, splitId, { hostOnly: true }, async (client) => {
+        const { rows } = await client.query(
+            'SELECT name, quantity, unit_price_cents FROM split_items WHERE id = $1 AND split_id = $2', [itemId, splitId])
+        item = rows[0]
+        if (!item) throw new HttpError(404, 'Item not found.', 'not_found')
+        const target = await client.query(
+            'SELECT 1 FROM split_participants WHERE split_id = $1 AND user_id = $2', [splitId, targetUserId])
+        if (target.rowCount === 0) throw new HttpError(404, "That person isn't part of this bill.", 'not_a_participant')
+        await Split.SetClaim(client, itemId, targetUserId, Boolean(claimed))
+    })
+    const snapshot = await broadcast(splitId)
+    if (claimed && targetUserId !== user.id) {
+        await notify(targetUserId, {
+            kind: 'item_assigned', key: `assign:${splitId}:${itemId}:${targetUserId}:${Date.now()}`,
+            actorId: user.id, groupId: snapshot?.groupId ?? null, splitId,
+            amountCents: item.quantity * item.unit_price_cents, label: item.name,
+        })
+    }
+    return snapshot
+}
+
 module.exports = {
+    assignItem,
     chooseCard,
     refundParticipant,
     startSplit,

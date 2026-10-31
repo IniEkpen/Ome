@@ -31,6 +31,16 @@ router.put('/:splitId/card', async (req, res) => {
 })
 
 // Host only from here down.
+
+// The roulette: put an item on someone's share ({ userId, claimed: true }) or
+// take it off ({ userId, claimed: false }).
+router.put('/:splitId/items/:itemId/assign', async (req, res) => {
+    const userId = Number(req.body?.userId)
+    if (!Number.isInteger(userId) || userId <= 0) throw new HttpError(400, 'Choose who it goes to.', 'invalid_user')
+    const split = await splits.assignItem(
+        req.user, idParam(req, 'splitId'), idParam(req, 'itemId'), userId, req.body?.claimed !== false)
+    return res.json({ split })
+})
 router.put('/:splitId/mode', async (req, res) => {
     return res.json({ split: await splits.setMode(req.user, idParam(req, 'splitId'), req.body?.mode) })
 })
