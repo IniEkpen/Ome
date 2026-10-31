@@ -7,6 +7,7 @@ const groupRoutes = require('./controllers/groupRoutes')
 const splitRoutes = require('./controllers/splitRoutes')
 const payments = require('./controllers/paymentRoutes')
 const networkRoutes = require('./controllers/networkRoutes')
+const receiptRoutes = require('./controllers/receiptRoutes')
 const { pool } = require('./db')
 
 const app = express()
@@ -43,6 +44,8 @@ app.use('/groups', groupRoutes)
 app.use('/splits', splitRoutes)
 app.use('/payments', payments.router)
 app.use('/network', networkRoutes)
+// Receipt photos arrive as raw image bodies, which express.json() leaves alone.
+app.use('/receipts', receiptRoutes)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))
 
@@ -54,6 +57,9 @@ app.use((error, req, res, next) => {
     }
     if (error.type === 'entity.parse.failed') {
         return res.status(400).json({ error: 'Invalid JSON body', code: 'invalid_json' })
+    }
+    if (error.type === 'entity.too.large') {
+        return res.status(413).json({ error: 'That upload is too large.', code: 'too_large' })
     }
     console.error(error)
     return res.status(500).json({ error: 'Something went wrong. Please try again.', code: 'server_error' })

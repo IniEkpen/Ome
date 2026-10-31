@@ -44,7 +44,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Yuwo uses the camera to scan your card when you add it, if you choose to.</string>
+	<string>Yuwo uses the camera to photograph receipts for a bill, and to scan your card when you add it, if you choose to.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Yuwo lets you pick a photo of a receipt to fill in a bill and share it with your group.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

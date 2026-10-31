@@ -40,6 +40,34 @@ class SplitItem {
   );
 }
 
+/// The card someone's share is charged to, as the group sees it.
+class BillCard {
+  const BillCard({
+    required this.brand,
+    required this.last4,
+    this.chosen = false,
+  });
+
+  factory BillCard.fromJson(Map<String, dynamic> json) => BillCard(
+    brand: json['brand'] as String?,
+    last4: json['last4'] as String,
+    chosen: json['chosen'] == true,
+  );
+
+  final String? brand;
+  final String last4;
+
+  /// Picked for this bill rather than their default card.
+  final bool chosen;
+
+  String get label {
+    final name = brand == null || brand!.isEmpty
+        ? 'Card'
+        : brand![0].toUpperCase() + brand!.substring(1);
+    return '$name •••• $last4';
+  }
+}
+
 class SplitParticipant {
   const SplitParticipant({
     required this.userId,
@@ -50,6 +78,7 @@ class SplitParticipant {
     required this.chargeCents,
     required this.paymentStatus,
     required this.cardOnFile,
+    this.card,
   });
 
   final int userId;
@@ -62,6 +91,9 @@ class SplitParticipant {
   /// pending | not_required | processing | succeeded | failed | requires_action
   final String paymentStatus;
   final bool cardOnFile;
+
+  /// The card their share is charged to; null if they have none.
+  final BillCard? card;
 
   String get paymentLabel => switch (paymentStatus) {
     'succeeded' => 'Paid',
@@ -84,6 +116,9 @@ class SplitParticipant {
         chargeCents: json['chargeCents'] as int? ?? 0,
         paymentStatus: json['paymentStatus'] as String? ?? 'pending',
         cardOnFile: json['cardOnFile'] == true,
+        card: json['card'] is Map<String, dynamic>
+            ? BillCard.fromJson(json['card'] as Map<String, dynamic>)
+            : null,
       );
 }
 
@@ -103,6 +138,7 @@ class SplitBill {
     required this.totalCents,
     required this.collectedCents,
     required this.unclaimedItemIds,
+    this.receiptId,
   });
 
   final int id;
@@ -121,6 +157,9 @@ class SplitBill {
   final int totalCents;
   final int collectedCents;
   final List<int> unclaimedItemIds;
+
+  /// Photo of the receipt, if the host attached one.
+  final int? receiptId;
 
   bool get isClaiming => status == 'claiming';
   bool get isConfirmed => status == 'confirmed';
@@ -163,6 +202,7 @@ class SplitBill {
       totalCents: totals['totalCents'] as int? ?? 0,
       collectedCents: totals['collectedCents'] as int? ?? 0,
       unclaimedItemIds: List<int>.from(totals['unclaimedItemIds'] ?? const []),
+      receiptId: json['receiptId'] as int?,
     );
   }
 }

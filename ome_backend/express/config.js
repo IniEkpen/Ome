@@ -56,6 +56,14 @@ const config = {
         privateKey: (process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
     },
 
+    // Receipt scanning (LlamaCloud extraction). Off until LLAMA_API_KEY is set.
+    llama: {
+        apiKey: process.env.LLAMA_API_KEY,
+        baseUrl: process.env.LLAMA_CLOUD_BASE_URL || 'https://api.cloud.llamaindex.ai',
+        // 'agentic' reads messy receipts best; cheaper tiers are faster.
+        tier: process.env.LLAMA_EXTRACT_TIER || 'agentic',
+    },
+
     // Comma separated list of origins allowed to call the API from a browser.
     corsOrigins: list(process.env.CORS_ORIGINS),
     // Lets a browser on any host and port call the API. Off when NODE_ENV=production.

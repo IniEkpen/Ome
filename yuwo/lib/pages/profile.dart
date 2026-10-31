@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../payment.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/card_service.dart';
 import '../services/payment_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
@@ -220,14 +221,26 @@ class _PaymentCard extends StatefulWidget {
 
 class _PaymentCardState extends State<_PaymentCard> {
   late Future<CardStatus> _status;
+  List<SavedCard> _cards = const [];
   bool _adding = false;
 
   PaymentService get _payments => PaymentService(AuthScope.read(context));
+  CardService get _cardService => CardService(AuthScope.read(context));
 
   @override
   void initState() {
     super.initState();
     _status = _payments.cardStatus();
+    _loadCards();
+  }
+
+  Future<void> _loadCards() async {
+    try {
+      final cards = await _cardService.list();
+      if (mounted) setState(() => _cards = cards);
+    } on ApiException {
+      // The card summary above still shows the default card.
+    }
   }
 
   Future<void> _addCard() async {
@@ -236,12 +249,69 @@ class _PaymentCardState extends State<_PaymentCard> {
       final card = await _payments.addCard();
       if (card != null && mounted) {
         setState(() => _status = Future.value(card));
-        showMessage(context, 'Card saved');
+        showMessage(context, 'Card saved as your default');
+        await _loadCards();
       }
     } on ApiException catch (e) {
       if (mounted) showMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  Future<void> _manage(SavedCard card) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(card.label, style: AppText.sectionTitle),
+              subtitle: card.expiry.isEmpty
+                  ? null
+                  : Text('Expires ${card.expiry}', style: AppText.caption),
+            ),
+            if (!card.isDefault && !card.expired)
+              ListTile(
+                leading: const Icon(Icons.star_outline),
+                title: const Text('Make default'),
+                subtitle: const Text('Used for bills unless you pick another'),
+                onTap: () => Navigator.pop(context, 'default'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text(
+                'Remove card',
+                style: TextStyle(color: AppColors.error),
+              ),
+              onTap: () => Navigator.pop(context, 'remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    try {
+      final cards = action == 'default'
+          ? await _cardService.makeDefault(card)
+          : await _cardService.remove(card);
+      if (!mounted) return;
+      setState(() {
+        _cards = cards;
+        // The default card is what the card check uses.
+        _status = _payments.cardStatus();
+      });
+      showMessage(
+        context,
+        action == 'default'
+            ? '${card.label} is now your default'
+            : '${card.label} removed',
+      );
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
     }
   }
 
@@ -280,9 +350,45 @@ class _PaymentCardState extends State<_PaymentCard> {
                     ? 'No card on file. Used to pay your share of a bill.'
                     : '${card.label} (expired)',
               ),
+              if (_cards.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.field),
+                Material(
+                  type: MaterialType.transparency,
+                  child: Column(
+                    children: [
+                      for (final saved in _cards)
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.credit_card),
+                          title: Text(saved.label, style: AppText.body),
+                          subtitle: Text(
+                            [
+                              if (saved.expiry.isNotEmpty)
+                                'exp ${saved.expiry}',
+                              if (saved.expired) 'Expired',
+                            ].join(' · '),
+                            style: AppText.caption,
+                          ),
+                          trailing: saved.isDefault
+                              ? Text(
+                                  'Default',
+                                  style: AppText.caption.copyWith(
+                                    color: AppColors.path,
+                                  ),
+                                )
+                              : const Icon(Icons.more_horiz),
+                          onTap: () => _manage(saved),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.field),
               LoadingButton(
-                label: card.hasValidCard ? 'Replace card' : 'Add card',
+                label: _cards.isEmpty && !card.hasValidCard
+                    ? 'Add card'
+                    : 'Add another card',
                 loading: _adding,
                 onPressed: _addCard,
               ),

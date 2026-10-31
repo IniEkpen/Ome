@@ -31,6 +31,9 @@ class SplitService {
     required int taxCents,
     required int tipCents,
     required List<String> coHosts,
+    String? merchantName,
+    String? receiptDate,
+    int? receiptId,
   }) async {
     final split = _split(
       await _auth.client.post(
@@ -41,12 +44,25 @@ class SplitService {
           'taxCents': taxCents,
           'tipCents': tipCents,
           'hostUsernames': coHosts,
+          'merchantName': ?merchantName,
+          'receiptDate': ?receiptDate,
+          'receiptId': ?receiptId,
         },
       ),
       "Couldn't start the bill.",
     );
     return split!;
   }
+
+  /// Which of your saved cards pays your share (null = your default).
+  Future<SplitBill?> chooseCard(int splitId, String? paymentMethodId) async =>
+      _split(
+        await _auth.client.put(
+          '/splits/$splitId/card',
+          body: {'paymentMethodId': paymentMethodId},
+        ),
+        "Couldn't change your card.",
+      );
 
   Future<SplitBill?> setClaim(int splitId, int itemId, bool claimed) async =>
       _split(

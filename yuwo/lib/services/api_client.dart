@@ -119,6 +119,38 @@ class ApiClient {
 
   Future<ApiResponse> delete(String path) => _send('DELETE', path);
 
+  /// Uploads raw bytes (e.g. a photo) and decodes the JSON answer. Give a
+  /// longer [timeout] for work that takes a while, like reading a receipt.
+  Future<ApiResponse> postBytes(
+    String path,
+    List<int> bytes, {
+    required String contentType,
+    Map<String, String>? query,
+    Duration? timeout,
+  }) async {
+    final request = http.Request('POST', ApiConfig.uri(path, query))
+      ..headers.addAll(_headers())
+      ..headers['Content-Type'] = contentType
+      ..bodyBytes = bytes;
+    final response = await _fetch(request, timeout ?? ApiConfig.timeout);
+    return ApiResponse(response.statusCode, _decode(response.body));
+  }
+
+  /// Downloads raw bytes (e.g. a receipt photo). Throws an [ApiException]
+  /// with the server's message on failure.
+  Future<List<int>> getBytes(String path) async {
+    final request = http.Request('GET', ApiConfig.uri(path))
+      ..headers.addAll(_headers(accept: '*/*'));
+    final response = await _fetch(request, ApiConfig.timeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiResponse(
+        response.statusCode,
+        _decode(response.body),
+      ).error("Couldn't load that.");
+    }
+    return response.bodyBytes;
+  }
+
   Future<ApiResponse> _send(
     String method,
     String path, {
@@ -128,13 +160,14 @@ class ApiClient {
     final request = http.Request(method, ApiConfig.uri(path, query))
       ..headers.addAll(_headers());
     if (method != 'GET') request.body = jsonEncode(body ?? const {});
+    final response = await _fetch(request, ApiConfig.timeout);
+    return ApiResponse(response.statusCode, _decode(response.body));
+  }
 
+  Future<http.Response> _fetch(http.Request request, Duration timeout) async {
     try {
-      final streamed = await _http.send(request).timeout(ApiConfig.timeout);
-      final response = await http.Response.fromStream(
-        streamed,
-      ).timeout(ApiConfig.timeout);
-      return ApiResponse(response.statusCode, _decode(response.body));
+      final streamed = await _http.send(request).timeout(timeout);
+      return await http.Response.fromStream(streamed).timeout(timeout);
     } on TimeoutException {
       throw const ApiException('The server took too long to respond.');
     } on http.ClientException {
