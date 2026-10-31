@@ -9,6 +9,8 @@ const { split: Split, Split: SplitModel } = require('../models/Split')
 const { SPLIT_MODES } = require('./splitCalculator')
 const { publishSplit } = require('./splitEvents')
 const payments = require('./paymentService')
+const cards = require('./cardService')
+const receipts = require('./receiptService')
 
 const MAX_ITEMS = 100
 const MAX_CENTS = 10_000_00 // $10,000 per line / tax / tip
@@ -87,6 +89,7 @@ async function startSplit(user, groupId, body) {
         throw new HttpError(403, 'Only the group owner can start a bill.', 'owner_only')
     }
     const bill = validateBill(body)
+    const receiptId = await receipts.claimForBill(user.id, body.receiptId)
     const members = await Group.AcceptedMembers(groupId)
     const memberIds = members.map((m) => m.id)
     const coHostNames = Array.isArray(body.hostUsernames) ? body.hostUsernames : []
@@ -102,6 +105,7 @@ async function startSplit(user, groupId, body) {
             currency: config.stripe.currency,
             hostIds,
             memberIds,
+            receiptId,
             ...bill,
         })
     } catch (error) {
@@ -204,7 +208,31 @@ async function refundParticipant(user, splitId, targetUserId) {
     return broadcast(splitId)
 }
 
+// Someone picks which of their own cards pays their share of this bill
+// (null = their default). Allowed while the bill is open, or after their
+// payment failed so the host can retry it on the new card.
+async function chooseCard(user, splitId, paymentMethodId) {
+    const choice = await cards.checkChoice(user, paymentMethodId)
+    const outcome = await Split.Mutate(splitId, async (client, split) => {
+        const { rows } = await client.query(
+            'SELECT is_host, payment_status FROM split_participants WHERE split_id = $1 AND user_id = $2',
+            [splitId, user.id])
+        const me = rows[0]
+        if (!me) throw new HttpError(403, "You're not part of this bill.", 'not_a_participant')
+        if (me.is_host) throw new HttpError(409, "Hosts aren't charged for their own bill.", 'host_not_charged')
+        const canChange = split.status === 'claiming'
+            || (split.status === 'confirmed' && ['pending', 'failed', 'requires_action'].includes(me.payment_status))
+        if (!canChange) throw new HttpError(409, "Your share has already been charged.", 'split_closed')
+        await client.query(
+            'UPDATE split_participants SET payment_method_id = $3 WHERE split_id = $1 AND user_id = $2',
+            [splitId, user.id, choice])
+    })
+    if (!outcome) throw new HttpError(404, 'Bill not found.', 'not_found')
+    return broadcast(splitId)
+}
+
 module.exports = {
+    chooseCard,
     refundParticipant,
     startSplit,
     getActiveSplit,

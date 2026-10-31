@@ -8,6 +8,7 @@ const payments = require('../services/paymentService')
 const splits = require('../services/splitService')
 const direct = require('../services/directPaymentService')
 const history = require('../services/historyService')
+const cards = require('../services/cardService')
 
 // Stripe signs each endpoint with its own secret; the platform endpoint and a
 // Connect endpoint may both point here, so any configured secret is accepted.
@@ -149,6 +150,20 @@ router.post('/direct/:paymentId/refund', async (req, res) => {
 // Every payment in or out, newest first. Pass ?before=<nextBefore> for more.
 router.get('/history', async (req, res) => {
     return res.json(await history.history(req.user.id, { before: req.query.before, limit: req.query.limit }))
+})
+
+// Every saved card, default first. Adding one is the setup-intent flow below
+// (a new card becomes the default).
+router.get('/cards', async (req, res) => {
+    return res.json({ cards: await cards.listCards(await currentUser(req)) })
+})
+
+router.post('/cards/:paymentMethodId/default', async (req, res) => {
+    return res.json({ cards: await cards.setDefault(await currentUser(req), req.params.paymentMethodId) })
+})
+
+router.delete('/cards/:paymentMethodId', async (req, res) => {
+    return res.json({ cards: await cards.removeCard(await currentUser(req), req.params.paymentMethodId) })
 })
 
 router.get('/card', async (req, res) => {

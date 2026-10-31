@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../pages/receipt_view.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/card_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
@@ -120,6 +122,61 @@ class _SplitCheckoutState extends State<SplitCheckout> {
     }
   }
 
+  /// Pick which of your saved cards pays your share of this bill.
+  Future<void> _chooseCard(SplitBill split, SplitParticipant me) async {
+    final List<SavedCard> cards;
+    try {
+      cards = await CardService(AuthScope.read(context)).list();
+    } on ApiException catch (e) {
+      _show(e.message);
+      return;
+    }
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<SavedCard>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gap),
+              child: SectionHeader(
+                'Pay your share with',
+                subtitle: 'Add or remove cards in Profile',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.field),
+            for (final card in cards)
+              ListTile(
+                enabled: !card.expired,
+                leading: const Icon(Icons.credit_card),
+                title: Text(card.label, style: AppText.body),
+                subtitle: Text(
+                  [
+                    if (card.expiry.isNotEmpty) 'exp ${card.expiry}',
+                    if (card.isDefault) 'Default',
+                    if (card.expired) 'Expired',
+                  ].join(' · '),
+                  style: AppText.caption,
+                ),
+                trailing:
+                    me.card?.last4 == card.last4 && me.card?.label == card.label
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(context, card),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) {
+      await _run(() => _service.chooseCard(split.id, picked.id));
+    }
+  }
+
   Future<void> _cancel(SplitBill split) async {
     if (await _ask(
       'Cancel this bill?',
@@ -129,6 +186,18 @@ class _SplitCheckoutState extends State<SplitCheckout> {
       await _hostAction(() => _service.cancel(split.id));
     }
   }
+
+  /// Members pick their card while the bill is open, or after their card
+  /// was declined so the host can retry on another one.
+  static bool _canChangeCard(SplitBill split, SplitParticipant me) =>
+      !me.isHost &&
+      (split.isClaiming ||
+          (split.isConfirmed &&
+              const [
+                'pending',
+                'failed',
+                'requires_action',
+              ].contains(me.paymentStatus)));
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +222,19 @@ class _SplitCheckoutState extends State<SplitCheckout> {
                 style: AppText.sectionTitle.copyWith(fontSize: 16),
               ),
               actions: [
+                if (split?.receiptId != null)
+                  IconButton(
+                    tooltip: 'View receipt',
+                    icon: const Icon(Icons.receipt_long),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ReceiptViewPage(
+                          receiptId: split!.receiptId!,
+                          title: split.title,
+                        ),
+                      ),
+                    ),
+                  ),
                 _LiveDot(connected: widget.live.connected),
                 if (split != null && isHost && split.isClaiming)
                   PopupMenuButton<void>(
@@ -196,6 +278,10 @@ class _SplitCheckoutState extends State<SplitCheckout> {
                               myId: me?.userId,
                               canWaive: isHost && split.isClaiming && !_busy,
                               onWaive: (person) => _waive(split, person),
+                              onChangeCard:
+                                  me == null || !_canChangeCard(split, me)
+                                  ? null
+                                  : () => _chooseCard(split, me),
                             ),
                           ],
                         ),
@@ -437,12 +523,16 @@ class _People extends StatelessWidget {
     required this.myId,
     required this.canWaive,
     required this.onWaive,
+    this.onChangeCard,
   });
 
   final SplitBill split;
   final int? myId;
   final bool canWaive;
   final ValueChanged<SplitParticipant> onWaive;
+
+  /// Set when you can change which card pays your share.
+  final VoidCallback? onChangeCard;
 
   @override
   Widget build(BuildContext context) {
@@ -498,6 +588,11 @@ class _People extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (person.userId == myId && onChangeCard != null)
+                    TextButton(
+                      onPressed: onChangeCard,
+                      child: const Text('Change card'),
+                    ),
                   if (canWaive && !person.isHost && person.owedCents > 0)
                     TextButton(
                       onPressed: () => onWaive(person),
@@ -532,13 +627,20 @@ class _People extends StatelessWidget {
   }
 
   String _subtitle(SplitParticipant person) {
-    if (!split.isClaiming) return person.paymentLabel;
-    if (person.isHost) return 'Host · paying the bill';
-    if (!person.cardOnFile) return 'No valid card on file';
-    if (person.waivedCents > 0) {
-      return '${Money.format(person.waivedCents)} waived by host';
+    // Members show the card their share goes on, so everyone can see it.
+    final card = person.isHost ? null : person.card?.label;
+    if (!split.isClaiming) {
+      return [person.paymentLabel, ?card].join(' · ');
     }
-    return 'Member';
+    if (person.isHost) return 'Host · paying the bill';
+    if (!person.cardOnFile && !(person.card?.chosen ?? false)) {
+      return 'No valid card on file';
+    }
+    return [
+      card ?? 'Member',
+      if (person.waivedCents > 0)
+        '${Money.format(person.waivedCents)} waived by host',
+    ].join(' · ');
   }
 }
 

@@ -391,6 +391,55 @@ CREATE INDEX IF NOT EXISTS transactions_recipient_time ON transactions (recipien
 
 
 -- ---------------------------------------------------------------------------
+-- user_cards: every card a person has saved (the default is also on users)
+-- ---------------------------------------------------------------------------
+-- All attached to the person's Stripe customer. Only display details are
+-- kept; the card itself lives with Stripe.
+CREATE TABLE IF NOT EXISTS user_cards (
+    stripe_payment_method_id  TEXT PRIMARY KEY,
+    user_id                   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand                     VARCHAR(32),
+    last4                     VARCHAR(4),
+    exp_month                 INT CHECK (exp_month BETWEEN 1 AND 12),
+    exp_year                  INT,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards (user_id, created_at DESC);
+
+-- Cards saved before this table existed: everyone's default card.
+INSERT INTO user_cards (stripe_payment_method_id, user_id, brand, last4, exp_month, exp_year)
+SELECT default_payment_method_id, id, card_brand, card_last4, card_exp_month, card_exp_year
+FROM users WHERE default_payment_method_id IS NOT NULL AND deleted_at IS NULL
+ON CONFLICT (stripe_payment_method_id) DO NOTHING;
+
+-- Which of their cards someone chose for this bill. NULL means their default.
+ALTER TABLE split_participants ADD COLUMN IF NOT EXISTS payment_method_id TEXT;
+
+
+-- ---------------------------------------------------------------------------
+-- receipts: the photo behind a bill, and what was read from it
+-- ---------------------------------------------------------------------------
+-- Uploaded when the host scans a receipt, then attached to the bill they
+-- start. Everyone in the group can view it. Photos are kept small by the
+-- app (about 0.5 MB); unattached ones are cleared after a day.
+CREATE TABLE IF NOT EXISTS receipts (
+    id            SERIAL PRIMARY KEY,
+    uploaded_by   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content_type  VARCHAR(32) NOT NULL
+                  CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/heic')),
+    image         BYTEA NOT NULL,
+    size_bytes    INT NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+    -- What the receipt reader found (merchant, date, items, tax, total), as returned.
+    extracted     JSONB,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE splits ADD COLUMN IF NOT EXISTS receipt_id INT REFERENCES receipts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS receipts_uploader_time ON receipts (uploaded_by, created_at);
+
+
+-- ---------------------------------------------------------------------------
 -- direct_payments: paying one person back outside a group ("Pay back")
 -- ---------------------------------------------------------------------------
 -- Always for a stated expense (the note), never open-ended money sending.

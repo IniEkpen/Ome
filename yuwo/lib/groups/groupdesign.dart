@@ -120,10 +120,7 @@ class _Grouping extends State<Group> {
 
                 const SizedBox(height: AppSpacing.section),
 
-                const SectionHeader(
-                  "Groups",
-                  subtitle: "Groups you've joined",
-                ),
+                const SectionHeader("Groups", subtitle: "Groups you've joined"),
                 const SizedBox(height: AppSpacing.field),
                 const Joined(),
               ],

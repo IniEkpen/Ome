@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { profile } = require('../models/Profile')
 const { requireUser, HttpError } = require('../auth')
 const splits = require('../services/splitService')
 
@@ -19,6 +20,14 @@ router.put('/:splitId/items/:itemId/claim', async (req, res) => {
     const split = await splits.setClaim(
         req.user, idParam(req, 'splitId'), idParam(req, 'itemId'), req.body?.claimed === true)
     return res.json({ split })
+})
+
+// Anyone being charged: which of their own cards pays their share.
+router.put('/:splitId/card', async (req, res) => {
+    const user = await profile.GetProfileById(req.user.id)
+    if (!user) throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
+    const choice = req.body?.paymentMethodId ?? null
+    return res.json({ split: await splits.chooseCard(user, idParam(req, 'splitId'), choice) })
 })
 
 // Host only from here down.

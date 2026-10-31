@@ -49,7 +49,9 @@ abstract final class StripeConfig {
           .timeout(ApiConfig.timeout);
       final json = jsonDecode(response.body);
       final key = json is Map<String, dynamic> ? json['publishableKey'] : null;
-      if (response.statusCode == 200 && key is String && key.startsWith('pk_')) {
+      if (response.statusCode == 200 &&
+          key is String &&
+          key.startsWith('pk_')) {
         _publishableKey = key;
         await _apply();
       }

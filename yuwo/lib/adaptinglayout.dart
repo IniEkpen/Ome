@@ -7,7 +7,7 @@ gv.GraphLayoutStrategy adaptiveLayoutFor(int nodeCount) {
   // Minimum center-to-center distance for two circles of this diameter to avoid touching
   final minSpacing = diameter * 2.2;
 
-  // making Coulomb repulsion strong enough to win against the springs pulling linked nodes together 
+  // making Coulomb repulsion strong enough to win against the springs pulling linked nodes together
   final coulombConstant = diameter * diameter * 6;
 
   if (nodeCount <= 3) {

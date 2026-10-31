@@ -20,7 +20,7 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   // center-to-center minimum for nodes
   final nodeSpacing = diameter * 2.0;
 
-   // gap a line must keep from a node
+  // gap a line must keep from a node
   final edgeClearance = diameter / 2 + 14;
 
   final width = canvasSize.width.isFinite ? canvasSize.width : 800.0;
@@ -33,7 +33,7 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   double clampY(double y) => y.clamp(margin, math.max(height - margin, margin));
 
   // fixed seed so I made it so layout is stable across rebuilds
-  final rng = math.Random(7); 
+  final rng = math.Random(7);
 
   // Seed on a circle so the simulation starts spread out rather than piled
   final positions = <gv.GraphId, Offset>{};
@@ -41,7 +41,8 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   final seedRadius = math.max(math.min(width, height) / 2 - margin, diameter);
   for (var i = 0; i < nodes.length; i++) {
     final angle = (2 * math.pi * i) / nodes.length;
-    positions[nodes[i].id] = center +
+    positions[nodes[i].id] =
+        center +
         Offset(math.cos(angle), math.sin(angle)) * seedRadius +
         Offset(rng.nextDouble() * 4 - 2, rng.nextDouble() * 4 - 2);
   }
@@ -94,7 +95,9 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
       for (final node in nodes) {
         if (node.id == aId || node.id == bId) continue;
         final p = positions[node.id]!;
-        var t = ((p.dx - p1.dx) * segment.dx + (p.dy - p1.dy) * segment.dy) / segLenSq;
+        var t =
+            ((p.dx - p1.dx) * segment.dx + (p.dy - p1.dy) * segment.dy) /
+            segLenSq;
         t = t.clamp(0.0, 1.0);
         final closest = p1 + segment * t;
         var away = p - closest;
@@ -142,7 +145,8 @@ gv.GraphLayoutStrategy edgeAvoidingLayoutFor(gv.Graph graph, Size canvasSize) {
   final half = Offset(diameter / 2, diameter / 2);
   final topLeft = {
     for (final e in positions.entries)
-      e.key: Offset(
+      e.key:
+          Offset(
             clampX(center.dx + (e.value.dx - layoutCenter.dx) * fit),
             clampY(center.dy + (e.value.dy - layoutCenter.dy) * fit),
           ) -

@@ -22,6 +22,7 @@ const { split: Split } = require('../models/Split')
 const { divideEvenly } = require('./splitCalculator')
 const { pool } = require('../db')
 const { HttpError } = require('../auth')
+const cards = require('./cardService')
 
 async function ensureCustomer(user) {
     if (user.stripe_customer_id) return user.stripe_customer_id
@@ -62,13 +63,17 @@ async function saveCardFromSetupIntent(setupIntentId, expectedCustomerId) {
     await stripe.customers.update(setupIntent.customer, {
         invoice_settings: { default_payment_method: method.id },
     })
-    return profile.SetDefaultCard(setupIntent.customer, {
+    const card = {
         paymentMethodId: method.id,
         brand: method.card?.brand || null,
         last4: method.card?.last4 || null,
         expMonth: method.card?.exp_month || null,
         expYear: method.card?.exp_year || null,
-    })
+    }
+    // A newly added card becomes the default and joins the person's card list.
+    const owner = await profile.SetDefaultCard(setupIntent.customer, card)
+    if (owner) await cards.rememberCard(owner.id, card)
+    return owner
 }
 
 // ---------------------------------------------------------------------------
