@@ -31,6 +31,9 @@ function describe(row) {
         payback_received: [`${who} paid you ${amount}`, label, 'payments'],
         payback_refunded: [`${who} refunded your ${amount}`, label, 'payments'],
         group_invite: [`${who} invited you to ${group ?? 'a group'}`, 'Accept or decline in Groups', 'groups'],
+        // label = the item; amount = its price.
+        item_assigned: [`${who} added ${row.label ?? 'an item'} to your share`,
+            [amount, group].filter(Boolean).join(' · '), 'group'],
     }[row.kind] ?? ['Something changed', '', 'payments']
     return {
         id: Number(row.id), // BIGINT arrives as a string

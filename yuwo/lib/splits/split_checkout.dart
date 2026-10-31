@@ -7,6 +7,7 @@ import '../services/card_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
+import 'assign_items.dart';
 import 'split_model.dart';
 import 'split_service.dart';
 
@@ -265,6 +266,22 @@ class _SplitCheckoutState extends State<SplitCheckout> {
                               ),
                             ),
                             const SizedBox(height: AppSpacing.field),
+                            // Who had what only matters when splitting by item.
+                            if (isHost &&
+                                split.isClaiming &&
+                                split.mode == SplitMode.byItem) ...[
+                              OutlinedButton.icon(
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AssignItemsPage(live: widget.live),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.swipe_up_outlined),
+                                label: const Text('Assign items to people'),
+                              ),
+                              const SizedBox(height: AppSpacing.field),
+                            ],
                             _Receipt(
                               split: split,
                               myId: me?.userId,
@@ -452,11 +469,11 @@ class _ReceiptLine extends StatelessWidget {
             isSelected: mine,
             style: IconButton.styleFrom(
               backgroundColor: mine
-                  ? AppColors.groupCards[0].first
+                  ? AppColors.textPrimary
                   : AppColors.background,
               foregroundColor: mine ? AppColors.surface : AppColors.hint,
               disabledBackgroundColor: mine
-                  ? AppColors.groupCards[0].first.withValues(alpha: 0.6)
+                  ? AppColors.textPrimary.withValues(alpha: 0.6)
                   : AppColors.background,
             ),
             icon: const Icon(Icons.receipt_long_outlined),
@@ -563,7 +580,13 @@ class _People extends StatelessWidget {
                         : AppColors.textPrimary,
                     child: Text(
                       person.username[0].toUpperCase(),
-                      style: AppText.sectionTitle.copyWith(color: null),
+                      // copyWith(color: null) keeps the style's black, which
+                      // hid the host's initial on their black circle.
+                      style: AppText.sectionTitle.copyWith(
+                        color: person.isHost
+                            ? AppColors.surface
+                            : AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.field),

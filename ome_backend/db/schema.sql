@@ -505,7 +505,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     user_id            INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     kind               VARCHAR(32) NOT NULL
                        CHECK (kind IN ('bill_opened', 'bill_cancelled', 'share_charged', 'share_declined',
-                                       'paid_you', 'payback_received', 'payback_refunded', 'group_invite')),
+                                       'paid_you', 'payback_received', 'payback_refunded', 'group_invite',
+                                       'item_assigned')),
     actor_id           INT REFERENCES users(id) ON DELETE SET NULL,
     group_id           INT REFERENCES groups(id) ON DELETE SET NULL,
     split_id           INT REFERENCES splits(id) ON DELETE SET NULL,
@@ -519,6 +520,12 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (user_id, dedupe_key)
 );
+
+-- upgrade: kinds added since the table was created.
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_kind_check,
+    ADD CONSTRAINT notifications_kind_check
+        CHECK (kind IN ('bill_opened', 'bill_cancelled', 'share_charged', 'share_declined',
+                        'paid_you', 'payback_received', 'payback_refunded', 'group_invite', 'item_assigned'));
 
 CREATE INDEX IF NOT EXISTS notifications_inbox ON notifications (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS notifications_unread ON notifications (user_id) WHERE read_at IS NULL;
