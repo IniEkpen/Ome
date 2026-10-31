@@ -5,8 +5,20 @@ const { profile, Profile } = require('../models/Profile')
 const splits = require('../services/splitService')
 const payments = require('../services/paymentService')
 const { subscribe } = require('../services/splitEvents')
+const { notify } = require('../services/notifyService')
+const { pool } = require('../db')
 
 router.use(requireUser)
+
+// Only people whose invite is waiting, not anyone already in the group.
+async function notifyInvited(groupId, inviterId, userIds) {
+    const { rows } = await pool.query(
+        `SELECT user_id FROM groupmembers WHERE group_id = $1 AND status = 'pending' AND user_id = ANY($2::int[])`,
+        [groupId, userIds])
+    await notify(rows.map((r) => r.user_id), {
+        kind: 'group_invite', key: `invite:${groupId}`, actorId: inviterId, groupId,
+    })
+}
 
 function idParam(req, name) {
     const id = Number(req.params[name])
@@ -50,6 +62,7 @@ router.post('/', async (req, res) => {
     const requested = Array.isArray(req.body.members) ? req.body.members.filter((m) => typeof m === 'string') : []
     const found = await profile.GetProfilesByUsernames(requested)
     const groupId = await Group.CreateGroup(req.user.id, groupName, found.map((u) => u.id))
+    await notifyInvited(groupId, req.user.id, found.map((u) => u.id))
     // Usernames match ignoring case, so compare lowercased.
     const foundNames = new Set(found.map((u) => u.username.toLowerCase()))
     return res.status(201).json({
@@ -77,6 +90,7 @@ router.post('/:groupId/members', async (req, res) => {
     const requested = Array.isArray(req.body?.members) ? req.body.members.filter((m) => typeof m === 'string') : []
     const found = await profile.GetProfilesByUsernames(requested)
     const invited = await Group.InviteMembers(groupId, req.user.id, found.map((u) => u.id))
+    await notifyInvited(groupId, req.user.id, found.map((u) => u.id))
     return res.json({ invited })
 })
 

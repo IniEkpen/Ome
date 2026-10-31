@@ -11,6 +11,7 @@ const { publishSplit } = require('./splitEvents')
 const payments = require('./paymentService')
 const cards = require('./cardService')
 const receipts = require('./receiptService')
+const { notify } = require('./notifyService')
 
 const MAX_ITEMS = 100
 const MAX_CENTS = 10_000_00 // $10,000 per line / tax / tip
@@ -114,7 +115,11 @@ async function startSplit(user, groupId, body) {
         }
         throw error
     }
-    return broadcast(splitId)
+    const snapshot = await broadcast(splitId)
+    await notify(memberIds.filter((id) => id !== user.id), {
+        kind: 'bill_opened', key: `bill_opened:${splitId}`, actorId: user.id, groupId, splitId, label: bill.title,
+    })
+    return snapshot
 }
 
 async function getActiveSplit(user, groupId) {
@@ -175,7 +180,14 @@ async function confirmSplit(user, splitId) {
 
 async function cancelSplit(user, splitId) {
     await changeOpenSplit(user, splitId, { hostOnly: true }, (client) => Split.SetStatus(client, splitId, 'cancelled', user.id))
-    return broadcast(splitId)
+    const snapshot = await broadcast(splitId)
+    if (snapshot) {
+        await notify(snapshot.participants.map((p) => p.userId).filter((id) => id !== user.id), {
+            kind: 'bill_cancelled', key: `bill_cancelled:${splitId}`, actorId: user.id,
+            groupId: snapshot.groupId, splitId, label: snapshot.title,
+        })
+    }
+    return snapshot
 }
 
 // After a decline or once Stripe keys are configured, a host can try unpaid shares again.
