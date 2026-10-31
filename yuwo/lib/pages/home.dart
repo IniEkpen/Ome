@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
 import 'home_data.dart';
+import 'pay_back.dart';
 
 /// The Home tab: loads the signed-in user's bills and activity from the API.
 /// Dev sessions the server didn't issue a token for get sample data instead.
@@ -92,13 +93,37 @@ class HomePage extends StatelessWidget {
   /// Enables pull-to-refresh when set.
   final Future<void> Function()? onRefresh;
 
+  Future<void> _payBack(BuildContext context) async {
+    final message = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const PayBackPage()));
+    if (message == null || !context.mounted) return;
+    showMessage(context, message);
+    await onRefresh?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final home = data ?? HomeData.mock();
     final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
     final body = _body(home, open);
     return Scaffold(
-      appBar: const YuwoAppBar(),
+      appBar: YuwoAppBar(
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton.filled(
+              tooltip: 'Pay someone back',
+              icon: const Icon(Icons.send_rounded, size: 20),
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.textPrimary,
+                foregroundColor: AppColors.surface,
+              ),
+              onPressed: () => _payBack(context),
+            ),
+          ),
+        ],
+      ),
       body: onRefresh == null
           ? body
           : RefreshIndicator(onRefresh: onRefresh!, child: body),
@@ -107,49 +132,49 @@ class HomePage extends StatelessWidget {
 
   Widget _body(HomeData home, List<HomeBill> open) {
     return PageBody(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (home.isMock) ...[
-              const _SampleDataBadge(),
-              const SizedBox(height: AppSpacing.field),
-            ],
-            _BalanceCard(home: home, openBills: open.length),
-            const SizedBox(height: AppSpacing.section),
-            const SectionHeader(
-              'Open Bills',
-              subtitle: 'Bills in your groups that still need something',
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (home.isMock) ...[
+            const _SampleDataBadge(),
             const SizedBox(height: AppSpacing.field),
-            if (open.isEmpty)
-              AppCard(
-                width: double.infinity,
-                child: Text(
-                  "You're all settled up",
-                  style: AppText.body.copyWith(color: AppColors.hint),
-                ),
-              )
-            else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                child: Row(
-                  spacing: AppSpacing.field,
-                  children: [
-                    for (var i = 0; i < open.length; i++)
-                      _BillCard(bill: open[i], colorIndex: i),
-                  ],
-                ),
-              ),
-            const SizedBox(height: AppSpacing.section),
-            const SectionHeader(
-              'Recent Activity',
-              subtitle: 'Payments and changes across your groups',
-            ),
-            const SizedBox(height: AppSpacing.field),
-            _ActivityList(activity: home.activity),
           ],
-        ),
+          _BalanceCard(home: home, openBills: open.length),
+          const SizedBox(height: AppSpacing.section),
+          const SectionHeader(
+            'Open Bills',
+            subtitle: 'Bills in your groups that still need something',
+          ),
+          const SizedBox(height: AppSpacing.field),
+          if (open.isEmpty)
+            AppCard(
+              width: double.infinity,
+              child: Text(
+                "You're all settled up",
+                style: AppText.body.copyWith(color: AppColors.hint),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              child: Row(
+                spacing: AppSpacing.field,
+                children: [
+                  for (var i = 0; i < open.length; i++)
+                    _BillCard(bill: open[i], colorIndex: i),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpacing.section),
+          const SectionHeader(
+            'Recent Activity',
+            subtitle: 'Payments and changes across your groups',
+          ),
+          const SizedBox(height: AppSpacing.field),
+          _ActivityList(activity: home.activity),
+        ],
+      ),
     );
   }
 }
