@@ -391,6 +391,49 @@ CREATE INDEX IF NOT EXISTS transactions_recipient_time ON transactions (recipien
 
 
 -- ---------------------------------------------------------------------------
+-- direct_payments: paying one person back outside a group ("Pay back")
+-- ---------------------------------------------------------------------------
+-- Always for a stated expense (the note), never open-ended money sending.
+-- Charged to the payer's saved card like a bill share; the money reaches the
+-- recipient through split_payouts and appears in transactions.
+CREATE TABLE IF NOT EXISTS direct_payments (
+    id                        SERIAL PRIMARY KEY,
+    payer_id                  INT NOT NULL REFERENCES users(id),
+    recipient_id              INT NOT NULL REFERENCES users(id),
+    -- $1 to $1,000 per payment (see services/directPaymentService.js).
+    amount_cents              INT NOT NULL CHECK (amount_cents BETWEEN 100 AND 100000),
+    currency                  CHAR(3) NOT NULL DEFAULT 'usd',
+    -- What it's paying back, e.g. "Concert tickets". Required.
+    note                      VARCHAR(140) NOT NULL CHECK (length(trim(note)) > 0),
+    status                    VARCHAR(20) NOT NULL DEFAULT 'processing'
+                              CHECK (status IN ('processing', 'succeeded', 'failed', 'requires_action',
+                                                'refunded', 'disputed')),
+    stripe_payment_intent_id  TEXT UNIQUE,
+    payment_error_code        VARCHAR(64),
+    -- Sent by the app once per payment, so a double tap can't charge twice.
+    idempotency_key           VARCHAR(64) NOT NULL,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    paid_at                   TIMESTAMPTZ,
+    CHECK (payer_id <> recipient_id),
+    UNIQUE (payer_id, idempotency_key)
+);
+
+-- Daily limit check: what someone has sent in the last 24 hours.
+CREATE INDEX IF NOT EXISTS direct_payments_payer_time ON direct_payments (payer_id, created_at DESC);
+
+-- A payout comes from either a bill or a direct payment, never both.
+ALTER TABLE split_payouts ALTER COLUMN split_id DROP NOT NULL;
+ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE split_payouts ADD CONSTRAINT split_payouts_one_source
+        CHECK (num_nonnulls(split_id, direct_payment_id) = 1);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE SET NULL;
+ALTER TABLE stripe_disputes ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE SET NULL;
+
+
+-- ---------------------------------------------------------------------------
 -- stripe_webhook_events: Stripe retries webhooks, so each event is handled once
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stripe_webhook_events (

@@ -6,6 +6,8 @@ const { profile, Profile } = require('../models/Profile')
 const { getStripe, isStripeConfigured } = require('../services/stripeClient')
 const payments = require('../services/paymentService')
 const splits = require('../services/splitService')
+const direct = require('../services/directPaymentService')
+const history = require('../services/historyService')
 
 // Stripe signs each endpoint with its own secret; the platform endpoint and a
 // Connect endpoint may both point here, so any configured secret is accepted.
@@ -111,6 +113,43 @@ async function currentUser(req) {
 async function currentUserWithFreshConnect(req, options) {
     return payments.refreshConnectStatus(await currentUser(req), options)
 }
+
+// "Pay back": pay one person for a stated expense, outside any group.
+// A declined card answers 402 so the app can say why; anything else returns
+// the payment (status 'succeeded', or 'processing' while the bank decides).
+router.post('/direct', async (req, res) => {
+    const body = req.body || {}
+    const payment = await direct.sendPayment(req.user.id, {
+        recipientId: Number(body.recipientId),
+        amountCents: body.amountCents,
+        note: body.note,
+        idempotencyKey: body.idempotencyKey,
+    })
+    if (payment.status === 'failed') {
+        throw new HttpError(402,
+            payment.errorCode === 'insufficient_funds'
+                ? 'Your card was declined for insufficient funds. Try another card.'
+                : 'Your card was declined. Try another card from Profile.',
+            'payment_declined')
+    }
+    if (payment.status === 'requires_action') {
+        throw new HttpError(402, 'Your bank needs to approve this payment. Try another card from Profile.',
+            'authentication_required')
+    }
+    return res.status(201).json({ payment })
+})
+
+// Only the person who received a pay-back can refund it, in full.
+router.post('/direct/:paymentId/refund', async (req, res) => {
+    const paymentId = Number(req.params.paymentId)
+    if (!Number.isInteger(paymentId) || paymentId <= 0) throw new HttpError(400, 'Invalid id.', 'invalid_id')
+    return res.json({ payment: await direct.refundPayment(req.user.id, paymentId) })
+})
+
+// Every payment in or out, newest first. Pass ?before=<nextBefore> for more.
+router.get('/history', async (req, res) => {
+    return res.json(await history.history(req.user.id, { before: req.query.before, limit: req.query.limit }))
+})
 
 router.get('/card', async (req, res) => {
     const user = await currentUserWithFreshConnect(req)
