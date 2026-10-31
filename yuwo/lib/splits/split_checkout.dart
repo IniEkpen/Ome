@@ -469,11 +469,11 @@ class _ReceiptLine extends StatelessWidget {
             isSelected: mine,
             style: IconButton.styleFrom(
               backgroundColor: mine
-                  ? AppColors.groupCards[0].first
+                  ? AppColors.textPrimary
                   : AppColors.background,
               foregroundColor: mine ? AppColors.surface : AppColors.hint,
               disabledBackgroundColor: mine
-                  ? AppColors.groupCards[0].first.withValues(alpha: 0.6)
+                  ? AppColors.textPrimary.withValues(alpha: 0.6)
                   : AppColors.background,
             ),
             icon: const Icon(Icons.receipt_long_outlined),
