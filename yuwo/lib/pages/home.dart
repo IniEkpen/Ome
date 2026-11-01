@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/home_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import '../widgets/common.dart';
 import 'home_data.dart';
+import 'notifications.dart';
+import 'pay_back.dart';
+import 'payment_history.dart';
 
 /// The Home tab: loads the signed-in user's bills and activity from the API.
 /// Dev sessions the server didn't issue a token for get sample data instead.
@@ -92,64 +96,102 @@ class HomePage extends StatelessWidget {
   /// Enables pull-to-refresh when set.
   final Future<void> Function()? onRefresh;
 
+  Future<void> _payBack(BuildContext context) async {
+    final message = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const PayBackPage()));
+    if (message == null || !context.mounted) return;
+    showMessage(context, message);
+    await onRefresh?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final home = data ?? HomeData.mock();
     final open = home.bills.where((b) => b.stage != BillStage.paid).toList();
-    final body = _body(home, open);
+    final body = _body(context, home, open);
     return Scaffold(
-      appBar: const YuwoAppBar(),
+      appBar: YuwoAppBar(
+        actions: [
+          const _Bell(),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton.filled(
+              tooltip: 'Pay someone back',
+              icon: const Icon(Icons.send_rounded, size: 20),
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.textPrimary,
+                foregroundColor: AppColors.surface,
+              ),
+              onPressed: () => _payBack(context),
+            ),
+          ),
+        ],
+      ),
       body: onRefresh == null
           ? body
           : RefreshIndicator(onRefresh: onRefresh!, child: body),
     );
   }
 
-  Widget _body(HomeData home, List<HomeBill> open) {
+  Widget _body(BuildContext context, HomeData home, List<HomeBill> open) {
     return PageBody(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (home.isMock) ...[
-              const _SampleDataBadge(),
-              const SizedBox(height: AppSpacing.field),
-            ],
-            _BalanceCard(home: home, openBills: open.length),
-            const SizedBox(height: AppSpacing.section),
-            const SectionHeader(
-              'Open Bills',
-              subtitle: 'Bills in your groups that still need something',
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (home.isMock) ...[
+            const _SampleDataBadge(),
             const SizedBox(height: AppSpacing.field),
-            if (open.isEmpty)
-              AppCard(
-                width: double.infinity,
-                child: Text(
-                  "You're all settled up",
-                  style: AppText.body.copyWith(color: AppColors.hint),
-                ),
-              )
-            else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                child: Row(
-                  spacing: AppSpacing.field,
-                  children: [
-                    for (var i = 0; i < open.length; i++)
-                      _BillCard(bill: open[i], colorIndex: i),
-                  ],
+          ],
+          _BalanceCard(home: home, openBills: open.length),
+          const SizedBox(height: AppSpacing.section),
+          const SectionHeader(
+            'Open Bills',
+            subtitle: 'Bills in your groups that still need something',
+          ),
+          const SizedBox(height: AppSpacing.field),
+          if (open.isEmpty)
+            AppCard(
+              width: double.infinity,
+              child: Text(
+                "You're all settled up",
+                style: AppText.body.copyWith(color: AppColors.hint),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              child: Row(
+                spacing: AppSpacing.field,
+                children: [
+                  for (var i = 0; i < open.length; i++)
+                    _BillCard(bill: open[i], colorIndex: i),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpacing.section),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Expanded(
+                child: SectionHeader(
+                  'Recent Activity',
+                  subtitle: 'Payments and changes across your groups',
                 ),
               ),
-            const SizedBox(height: AppSpacing.section),
-            const SectionHeader(
-              'Recent Activity',
-              subtitle: 'Payments and changes across your groups',
-            ),
-            const SizedBox(height: AppSpacing.field),
-            _ActivityList(activity: home.activity),
-          ],
-        ),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaymentHistoryPage()),
+                ),
+                child: const Text('All payments'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.field),
+          _ActivityList(activity: home.activity),
+        ],
+      ),
     );
   }
 }
@@ -438,5 +480,26 @@ class _ActivityRow extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays == 1) return 'Yesterday';
     return '${diff.inDays} days ago';
+  }
+}
+
+/// Opens the in-app inbox; the badge counts unread notifications.
+class _Bell extends StatelessWidget {
+  const _Bell();
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = NotificationScope.maybeOf(context)?.unreadCount ?? 0;
+    return IconButton(
+      tooltip: unread == 0 ? 'Notifications' : 'Notifications, $unread unread',
+      onPressed: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
+      icon: Badge(
+        isLabelVisible: unread > 0,
+        label: Text(unread > 99 ? '99+' : '$unread'),
+        child: const Icon(Icons.notifications_none),
+      ),
+    );
   }
 }

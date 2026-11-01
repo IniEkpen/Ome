@@ -59,7 +59,10 @@ async function recentActivity(userId) {
         `SELECT * FROM (
             SELECT CASE WHEN t.sender_id = $1 THEN 'you_paid' ELSE 'paid_you' END AS kind,
                    CASE WHEN other.deleted_at IS NULL THEN other.username ELSE 'Deleted user' END AS who,
-                   g.group_name, t.amount_cents, t.created_at AS at
+                   -- No group (a direct payment, or a group since deleted): show
+                   -- what it was for (the note, or the bill's title) instead.
+                   COALESCE(g.group_name, t.note) AS group_name,
+                   t.amount_cents, t.created_at AS at
             FROM transactions t
             JOIN users other ON other.id = CASE WHEN t.sender_id = $1 THEN t.recipient_id ELSE t.sender_id END
             LEFT JOIN groups g ON g.id = t.group_id

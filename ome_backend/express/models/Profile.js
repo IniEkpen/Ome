@@ -43,19 +43,25 @@ class Profile {
 
     // Username search for pickers and the network map. Matches any username that
     // contains the typed letters in order, ranked exact > prefix > substring > in-order.
+    // Finds people by username (letters in order, so "jsmth" finds
+    // "john_smith") or by name ("ada love" finds Ada Lovelace).
     async SearchByUsername(query, excludeUserId, limit = 10) {
         // '_' is allowed in usernames but is a LIKE wildcard, so escape it.
         const escape = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`)
         const q = query.toLowerCase()
         const inOrder = `%${[...q].map(escape).join('%')}%`
+        const fullName = "lower(concat_ws(' ', first_name, last_name))"
         const result = await this.pool.query(
             `SELECT id, username, first_name, last_name FROM users
-             WHERE lower(username) LIKE $2 AND id <> $3 AND deleted_at IS NULL
+             WHERE (lower(username) LIKE $2 OR ${fullName} LIKE '%' || $4 || '%')
+               AND id <> $3 AND deleted_at IS NULL
              ORDER BY CASE
                         WHEN lower(username) = $1 THEN 0
                         WHEN lower(username) LIKE $4 || '%' THEN 1
                         WHEN lower(username) LIKE '%' || $4 || '%' THEN 2
-                        ELSE 3
+                        WHEN ${fullName} LIKE $4 || '%' THEN 3
+                        WHEN ${fullName} LIKE '%' || $4 || '%' THEN 4
+                        ELSE 5
                       END,
                       length(username), lower(username)
              LIMIT $5`, [q, inOrder, excludeUserId, escape(q), limit])

@@ -161,7 +161,8 @@ class _MemberStack extends StatelessWidget {
               left: i * 18,
               child: CircleAvatar(
                 radius: size / 2,
-                backgroundColor: AppColors.textPrimary,
+                // White ring so overlapping black avatars stay apart.
+                backgroundColor: AppColors.surface,
                 child: CircleAvatar(
                   radius: size / 2 - 2,
                   backgroundColor: AppColors.groupCards[i % AppColors.groupCards.length].first,

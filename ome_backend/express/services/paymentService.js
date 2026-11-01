@@ -22,6 +22,8 @@ const { split: Split } = require('../models/Split')
 const { divideEvenly } = require('./splitCalculator')
 const { pool } = require('../db')
 const { HttpError } = require('../auth')
+const cards = require('./cardService')
+const { notify } = require('./notifyService')
 
 async function ensureCustomer(user) {
     if (user.stripe_customer_id) return user.stripe_customer_id
@@ -62,13 +64,17 @@ async function saveCardFromSetupIntent(setupIntentId, expectedCustomerId) {
     await stripe.customers.update(setupIntent.customer, {
         invoice_settings: { default_payment_method: method.id },
     })
-    return profile.SetDefaultCard(setupIntent.customer, {
+    const card = {
         paymentMethodId: method.id,
         brand: method.card?.brand || null,
         last4: method.card?.last4 || null,
         expMonth: method.card?.exp_month || null,
         expYear: method.card?.exp_year || null,
-    })
+    }
+    // A newly added card becomes the default and joins the person's card list.
+    const owner = await profile.SetDefaultCard(setupIntent.customer, card)
+    if (owner) await cards.rememberCard(owner.id, card)
+    return owner
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +209,7 @@ async function chargeSplit(splitId, attempt = 'initial') {
     for (const payer of payers) {
         if (!payer.stripe_customer_id || !payer.default_payment_method_id) {
             await Split.SetPaymentStatus(splitId, payer.user_id, 'failed')
+            await notifyDeclined(splitId, payer.user_id, `declined:${splitId}-${payer.user_id}-${attempt}`)
             continue
         }
         if (payer.currency !== config.stripe.currency) {
@@ -215,7 +222,9 @@ async function chargeSplit(splitId, attempt = 'initial') {
                 currency: config.stripe.currency,
                 customer: payer.stripe_customer_id,
                 payment_method: payer.default_payment_method_id,
-                payment_method_types: ['card'],
+                // Saved cards only, charged without the cardholder present: no redirects.
+                // (Stripe no longer accepts payment_method_types here.)
+                automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
                 off_session: true,
                 confirm: true,
                 transfer_group: `split_${splitId}`,
@@ -235,14 +244,20 @@ async function chargeSplit(splitId, attempt = 'initial') {
             const reason = error.decline_code || error.code
             console.error(`Charge failed for split ${splitId}, user ${payer.user_id}:`, reason || error.message)
             await Split.SetPaymentStatus(splitId, payer.user_id, status, intentId, reason)
+            await notifyDeclined(splitId, payer.user_id, `declined:${intentId || `${splitId}-${payer.user_id}-${attempt}`}`)
         }
     }
     await Split.SettleIfComplete(splitId)
     return { charged: true }
 }
 
-// Step 3: record the payment and pay the host(s).
+// Step 3: record the payment and pay the host(s). Also handles direct
+// payments (see directPaymentService), which return null as there's no bill.
 async function handlePaymentSucceeded(intent) {
+    if (intent.metadata?.direct_payment_id) {
+        await handleDirectPaymentSucceeded(intent)
+        return null
+    }
     const splitId = Number(intent.metadata?.split_id)
     const userId = Number(intent.metadata?.user_id)
     if (!splitId || !userId) return null
@@ -252,22 +267,78 @@ async function handlePaymentSucceeded(intent) {
     await Split.SetPaymentStatus(splitId, userId, 'succeeded', intent.id)
     await payoutToHosts(splitId, userId, intent)
     await Split.SettleIfComplete(splitId)
+    await notify(userId, {
+        kind: 'share_charged', key: `charged:${intent.id}`, splitId, groupId: await groupOf(splitId),
+        amountCents: intent.amount_received ?? intent.amount,
+    })
     return splitId
 }
 
+async function groupOf(splitId) {
+    const { rows } = await pool.query('SELECT group_id FROM splits WHERE id = $1', [splitId])
+    return rows[0]?.group_id ?? null
+}
+
+// A member's card was declined (or needs their bank's approval): tell them,
+// so they can pick another card for the host to retry.
+async function notifyDeclined(splitId, userId, key) {
+    await notify(userId, { kind: 'share_declined', key, splitId, groupId: await groupOf(splitId) })
+}
+
 async function handlePaymentFailed(intent, status = 'failed') {
+    if (intent.metadata?.direct_payment_id) {
+        const error = intent.last_payment_error
+        await pool.query(
+            `UPDATE direct_payments SET status = $2, stripe_payment_intent_id = $3, payment_error_code = $4
+             WHERE id = $1 AND status NOT IN ('succeeded', 'refunded', 'disputed')`,
+            [Number(intent.metadata.direct_payment_id), status, intent.id, error?.decline_code || error?.code || null])
+        return null
+    }
     const splitId = Number(intent.metadata?.split_id)
     const userId = Number(intent.metadata?.user_id)
     if (!splitId || !userId) return null
     const error = intent.last_payment_error
     await Split.SetPaymentStatus(splitId, userId, status, intent.id, error?.decline_code || error?.code)
+    await notifyDeclined(splitId, userId, `declined:${intent.id}`)
     return splitId
 }
 
 async function paymentStatusOf(paymentIntentId) {
     const { rows } = await pool.query(
-        'SELECT payment_status FROM split_participants WHERE stripe_payment_intent_id = $1', [paymentIntentId])
+        `SELECT payment_status FROM split_participants WHERE stripe_payment_intent_id = $1
+         UNION ALL SELECT status FROM direct_payments WHERE stripe_payment_intent_id = $1`, [paymentIntentId])
     return rows[0]?.payment_status ?? null
+}
+
+// A direct payment went through: record it and pay the recipient (held
+// until they finish payout verification, like a host's share of a bill).
+async function handleDirectPaymentSucceeded(intent) {
+    const current = await paymentStatusOf(intent.id)
+    if (current === 'refunded' || current === 'disputed') return
+    const { rows } = await pool.query(
+        `UPDATE direct_payments SET status = 'succeeded', stripe_payment_intent_id = $2,
+             paid_at = COALESCE(paid_at, now()), payment_error_code = NULL
+         WHERE id = $1 RETURNING *`, [Number(intent.metadata.direct_payment_id), intent.id])
+    const payment = rows[0]
+    if (!payment) return
+    await pool.query(
+        `INSERT INTO transactions (sender_id, recipient_id, amount_cents, currency, direct_payment_id,
+                                   stripe_payment_intent_id, is_private, note)
+         SELECT payer.id, $2, $3, $4, $5, $6, payer.transactions_private, $7
+         FROM users payer WHERE payer.id = $1
+         ON CONFLICT (stripe_payment_intent_id, recipient_id) DO NOTHING`,
+        [payment.payer_id, payment.recipient_id, payment.amount_cents, payment.currency, payment.id, intent.id,
+            payment.note])
+    const inserted = await pool.query(
+        `INSERT INTO split_payouts (direct_payment_id, host_user_id, source_payment_intent_id, amount_cents)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (source_payment_intent_id, host_user_id) DO NOTHING RETURNING id`,
+        [payment.id, payment.recipient_id, intent.id, intent.amount_received ?? payment.amount_cents])
+    if (inserted.rows[0]) await sendPayout(inserted.rows[0].id)
+    await notify(payment.recipient_id, {
+        kind: 'payback_received', key: `payback:${payment.id}`, actorId: payment.payer_id,
+        directPaymentId: payment.id, amountCents: payment.amount_cents, label: payment.note,
+    })
 }
 
 // Co-hosts share each incoming payment evenly.
@@ -275,8 +346,13 @@ async function payoutToHosts(splitId, payerId, intent) {
     const hosts = await Split.Hosts(splitId)
     const amount = intent.amount_received ?? intent.amount
     const shares = divideEvenly(amount, hosts.map((h) => h.id))
+    const groupId = await groupOf(splitId)
     for (const host of hosts) {
         await recordTransaction(splitId, payerId, host.id, shares.get(host.id), intent.id)
+        await notify(host.id, {
+            kind: 'paid_you', key: `paid_you:${intent.id}`, actorId: payerId, splitId, groupId,
+            amountCents: shares.get(host.id),
+        })
         const inserted = await pool.query(
             `INSERT INTO split_payouts (split_id, host_user_id, source_payment_intent_id, amount_cents)
              VALUES ($1, $2, $3, $4)
@@ -291,10 +367,12 @@ async function payoutToHosts(splitId, payerId, intent) {
 // member's payment is disputed; cancelled if it was refunded.
 async function sendPayout(payoutId) {
     const { rows } = await pool.query(
-        `SELECT p.*, u.stripe_connect_account_id, u.payouts_enabled, sp.payment_status AS payer_status
+        `SELECT p.*, u.stripe_connect_account_id, u.payouts_enabled,
+                COALESCE(sp.payment_status, dp.status) AS payer_status
          FROM split_payouts p
          JOIN users u ON u.id = p.host_user_id
          LEFT JOIN split_participants sp ON sp.stripe_payment_intent_id = p.source_payment_intent_id
+         LEFT JOIN direct_payments dp ON dp.id = p.direct_payment_id
          WHERE p.id = $1 AND p.status IN ('awaiting_host_onboarding', 'failed')`, [payoutId])
     const payout = rows[0]
     if (!payout) return
@@ -310,6 +388,7 @@ async function sendPayout(payoutId) {
     if (!payout.payouts_enabled || !payout.stripe_connect_account_id) return
 
     const stripe = getStripe()
+    const label = payout.split_id ? `Yuwo split #${payout.split_id}` : `Yuwo payment #${payout.direct_payment_id}`
     // A retry after Stripe refused the first attempt needs a fresh key; Stripe
     // replays the original error for a reused one.
     const idempotencyKey = payout.status === 'failed' ? `payout-${payout.id}-retry-${Date.now()}` : `payout-${payout.id}`
@@ -322,8 +401,12 @@ async function sendPayout(payoutId) {
             // Ties the transfer to the charge so it waits for those funds to be
             // available; Stripe copies the charge's transfer_group (split_<id>).
             source_transaction: intent.latest_charge,
-            description: `Yuwo split #${payout.split_id}`,
-            metadata: { split_id: String(payout.split_id), payout_id: String(payout.id) },
+            description: label,
+            metadata: {
+                ...(payout.split_id ? { split_id: String(payout.split_id) } : {}),
+                ...(payout.direct_payment_id ? { direct_payment_id: String(payout.direct_payment_id) } : {}),
+                payout_id: String(payout.id),
+            },
         }, { idempotencyKey })
         await pool.query(
             `UPDATE split_payouts SET status = 'paid', stripe_transfer_id = $2, paid_at = now(), last_error_code = NULL
@@ -407,6 +490,8 @@ async function reverseHostPayouts(paymentIntentId, reason, { reverseSent = true 
 
 // The money went back to the member: mark it and take it off the network map.
 async function markRefunded(paymentIntentId) {
+    await pool.query(
+        `UPDATE direct_payments SET status = 'refunded' WHERE stripe_payment_intent_id = $1`, [paymentIntentId])
     const { rows } = await pool.query(
         `UPDATE split_participants SET payment_status = 'refunded'
          WHERE stripe_payment_intent_id = $1 RETURNING split_id`, [paymentIntentId])
@@ -426,20 +511,27 @@ async function refundPayment(splitId, payerUserId) {
     if (!participant?.stripe_payment_intent_id || participant.payment_status !== 'succeeded') {
         throw new HttpError(409, 'Only a completed payment can be refunded.', 'not_refundable')
     }
-    const intentId = participant.stripe_payment_intent_id
+    await refundIntent(participant.stripe_payment_intent_id,
+        { split_id: String(splitId), user_id: String(payerUserId) })
+    return splitId
+}
+
+// Refunds one payment in full. What was sent on to the recipient is pulled
+// back first; if that fails (already moved to their bank) nothing is refunded
+// and the platform decides in the Stripe Dashboard.
+async function refundIntent(intentId, metadata) {
     const unrecovered = await reverseHostPayouts(intentId, 'refund')
     if (unrecovered.length > 0) {
         throw new HttpError(409,
-            "This payment was already paid out to the host's bank, so it can't be refunded in the app. Contact support.",
+            "This payment was already paid out to the recipient's bank, so it can't be refunded in the app. Contact support.",
             'refund_needs_support')
     }
     await getStripe().refunds.create({
         payment_intent: intentId,
         reason: 'requested_by_customer',
-        metadata: { split_id: String(splitId), user_id: String(payerUserId) },
+        metadata,
     }, { idempotencyKey: `refund-${intentId}` })
     await markRefunded(intentId)
-    return splitId
 }
 
 // Also covers refunds made from the Stripe Dashboard.
@@ -460,26 +552,32 @@ async function handleChargeRefunded(charge) {
 async function handleDispute(dispute) {
     const intentId = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id
     const { rows } = await pool.query(
-        'SELECT split_id, user_id, payment_status FROM split_participants WHERE stripe_payment_intent_id = $1',
+        `SELECT split_id, user_id, payment_status, NULL::int AS direct_payment_id
+         FROM split_participants WHERE stripe_payment_intent_id = $1
+         UNION ALL
+         SELECT NULL, payer_id, status, id FROM direct_payments WHERE stripe_payment_intent_id = $1`,
         [intentId])
     const participant = rows[0]
     const dueBy = dispute.evidence_details?.due_by ? new Date(dispute.evidence_details.due_by * 1000) : null
     await pool.query(
         `INSERT INTO stripe_disputes (id, stripe_payment_intent_id, split_id, payer_user_id, amount_cents,
-                                      reason, status, evidence_due_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                      reason, status, evidence_due_by, direct_payment_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, amount_cents = EXCLUDED.amount_cents,
              reason = EXCLUDED.reason, evidence_due_by = EXCLUDED.evidence_due_by, updated_at = now()`,
         [dispute.id, intentId || null, participant?.split_id ?? null, participant?.user_id ?? null,
-            dispute.amount, dispute.reason || null, dispute.status, dueBy])
+            dispute.amount, dispute.reason || null, dispute.status, dueBy, participant?.direct_payment_id ?? null])
     if (!participant) return null
     const splitId = participant.split_id
+    // Direct payments go through the same states as a bill share.
+    const table = splitId ? 'split_participants' : 'direct_payments'
+    const statusColumn = splitId ? 'payment_status' : 'status'
 
     if (dispute.status === 'won' || dispute.status === 'warning_closed') {
         // Back to a normal payment; payouts held during the dispute go out.
         await pool.query(
-            `UPDATE split_participants SET payment_status = 'succeeded'
-             WHERE stripe_payment_intent_id = $1 AND payment_status = 'disputed'`, [intentId])
+            `UPDATE ${table} SET ${statusColumn} = 'succeeded'
+             WHERE stripe_payment_intent_id = $1 AND ${statusColumn} = 'disputed'`, [intentId])
         await releasePayoutsForPayment(intentId)
     } else if (dispute.status === 'lost') {
         await reverseHostPayouts(intentId, 'dispute_lost', { reverseSent: config.stripe.recoverLostDisputesFromHosts })
@@ -487,9 +585,9 @@ async function handleDispute(dispute) {
     } else if (participant.payment_status === 'succeeded') {
         // Open dispute: hold anything not yet sent to the host (see sendPayout).
         await pool.query(
-            `UPDATE split_participants SET payment_status = 'disputed' WHERE stripe_payment_intent_id = $1`, [intentId])
+            `UPDATE ${table} SET ${statusColumn} = 'disputed' WHERE stripe_payment_intent_id = $1`, [intentId])
     }
-    await Split.BumpVersion(splitId)
+    if (splitId) await Split.BumpVersion(splitId)
     return splitId
 }
 
@@ -523,6 +621,7 @@ module.exports = {
     handleChargeRefunded,
     handleDispute,
     refundPayment,
+    refundIntent,
     releasePendingPayouts,
     beginWebhookEvent,
     finishWebhookEvent,

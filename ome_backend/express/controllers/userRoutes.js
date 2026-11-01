@@ -5,6 +5,7 @@ const { rateLimit } = require('../rateLimit')
 const home = require('../services/homeService')
 const account = require('../services/accountService')
 const oauth = require('../services/oauthService')
+const notifications = require('../services/notifyService')
 const { usernameProblem, passwordProblem } = require('../credentials')
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -155,6 +156,38 @@ router.delete('/me', requireUser, async (req, res) => {
 // Everything the home page shows: open bills and recent activity.
 router.get('/me/home', requireUser, async (req, res) => {
     return res.json(await home.homeFor(req.user))
+})
+
+// The inbox behind the bell, newest first. ?before=<nextBefore> for more.
+router.get('/me/notifications', requireUser, async (req, res) => {
+    return res.json(await notifications.list(req.user.id, { before: req.query.before, limit: req.query.limit }))
+})
+
+// Body { all: true } or { ids: [...] }. Returns the new unread count.
+router.post('/me/notifications/read', requireUser, async (req, res) => {
+    const body = req.body || {}
+    return res.json({ unreadCount: await notifications.markRead(req.user.id, { ids: body.ids, all: body.all }) })
+})
+
+// Server-Sent Events for this person: new notifications (with the unread
+// count) as they happen, while the app is open.
+router.get('/me/events', requireUser, async (req, res) => {
+    res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+    })
+    res.flushHeaders()
+    const send = (payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`)
+    send({ type: 'hello', unreadCount: await notifications.unreadCount(req.user.id) })
+    const unsubscribe = notifications.subscribe(req.user.id, send)
+    // Keeps proxies (e.g. Render) from closing an idle connection.
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000)
+    req.on('close', () => {
+        clearInterval(heartbeat)
+        unsubscribe()
+    })
 })
 
 module.exports = router

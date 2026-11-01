@@ -7,6 +7,7 @@ import 'routes.dart';
 import 'services/auth_service.dart';
 import 'services/payment_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/notification_host.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,8 @@ class YuwoApp extends StatelessWidget {
 
   final AuthService auth;
 
+  static final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return AuthScope(
@@ -49,6 +52,10 @@ class YuwoApp extends StatelessWidget {
         title: 'Yuwo',
         theme: AppTheme.light,
         debugShowCheckedModeBanner: false,
+        navigatorKey: _navigatorKey,
+        // Above every screen, so the bell and banners work wherever you are.
+        builder: (context, child) =>
+            NotificationHost(navigatorKey: _navigatorKey, child: child!),
         initialRoute: AppRoutes.root,
         onGenerateRoute: (settings) =>
             AppRoutes.onGenerateRoute(settings, auth),

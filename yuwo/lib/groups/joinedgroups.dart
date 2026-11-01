@@ -75,6 +75,10 @@ class Joined extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(AppRadius.card),
+                  // A faint edge so stacked black cards don't merge.
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
                   // The bottom card lifts the whole stack; the rest cast
                   // upward onto the card beneath them.
                   boxShadow: index == 0

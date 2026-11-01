@@ -391,6 +391,98 @@ CREATE INDEX IF NOT EXISTS transactions_recipient_time ON transactions (recipien
 
 
 -- ---------------------------------------------------------------------------
+-- user_cards: every card a person has saved (the default is also on users)
+-- ---------------------------------------------------------------------------
+-- All attached to the person's Stripe customer. Only display details are
+-- kept; the card itself lives with Stripe.
+CREATE TABLE IF NOT EXISTS user_cards (
+    stripe_payment_method_id  TEXT PRIMARY KEY,
+    user_id                   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand                     VARCHAR(32),
+    last4                     VARCHAR(4),
+    exp_month                 INT CHECK (exp_month BETWEEN 1 AND 12),
+    exp_year                  INT,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS user_cards_user ON user_cards (user_id, created_at DESC);
+
+-- Cards saved before this table existed: everyone's default card.
+INSERT INTO user_cards (stripe_payment_method_id, user_id, brand, last4, exp_month, exp_year)
+SELECT default_payment_method_id, id, card_brand, card_last4, card_exp_month, card_exp_year
+FROM users WHERE default_payment_method_id IS NOT NULL AND deleted_at IS NULL
+ON CONFLICT (stripe_payment_method_id) DO NOTHING;
+
+-- Which of their cards someone chose for this bill. NULL means their default.
+ALTER TABLE split_participants ADD COLUMN IF NOT EXISTS payment_method_id TEXT;
+
+
+-- ---------------------------------------------------------------------------
+-- receipts: the photo behind a bill, and what was read from it
+-- ---------------------------------------------------------------------------
+-- Uploaded when the host scans a receipt, then attached to the bill they
+-- start. Everyone in the group can view it. Photos are kept small by the
+-- app (about 0.5 MB); unattached ones are cleared after a day.
+CREATE TABLE IF NOT EXISTS receipts (
+    id            SERIAL PRIMARY KEY,
+    uploaded_by   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content_type  VARCHAR(32) NOT NULL
+                  CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/heic')),
+    image         BYTEA NOT NULL,
+    size_bytes    INT NOT NULL CHECK (size_bytes BETWEEN 1 AND 5242880),
+    -- What the receipt reader found (merchant, date, items, tax, total), as returned.
+    extracted     JSONB,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE splits ADD COLUMN IF NOT EXISTS receipt_id INT REFERENCES receipts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS receipts_uploader_time ON receipts (uploaded_by, created_at);
+
+
+-- ---------------------------------------------------------------------------
+-- direct_payments: paying one person back outside a group ("Pay back")
+-- ---------------------------------------------------------------------------
+-- Always for a stated expense (the note), never open-ended money sending.
+-- Charged to the payer's saved card like a bill share; the money reaches the
+-- recipient through split_payouts and appears in transactions.
+CREATE TABLE IF NOT EXISTS direct_payments (
+    id                        SERIAL PRIMARY KEY,
+    payer_id                  INT NOT NULL REFERENCES users(id),
+    recipient_id              INT NOT NULL REFERENCES users(id),
+    -- $1 to $1,000 per payment (see services/directPaymentService.js).
+    amount_cents              INT NOT NULL CHECK (amount_cents BETWEEN 100 AND 100000),
+    currency                  CHAR(3) NOT NULL DEFAULT 'usd',
+    -- What it's paying back, e.g. "Concert tickets". Required.
+    note                      VARCHAR(140) NOT NULL CHECK (length(trim(note)) > 0),
+    status                    VARCHAR(20) NOT NULL DEFAULT 'processing'
+                              CHECK (status IN ('processing', 'succeeded', 'failed', 'requires_action',
+                                                'refunded', 'disputed')),
+    stripe_payment_intent_id  TEXT UNIQUE,
+    payment_error_code        VARCHAR(64),
+    -- Sent by the app once per payment, so a double tap can't charge twice.
+    idempotency_key           VARCHAR(64) NOT NULL,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    paid_at                   TIMESTAMPTZ,
+    CHECK (payer_id <> recipient_id),
+    UNIQUE (payer_id, idempotency_key)
+);
+
+-- Daily limit check: what someone has sent in the last 24 hours.
+CREATE INDEX IF NOT EXISTS direct_payments_payer_time ON direct_payments (payer_id, created_at DESC);
+
+-- A payout comes from either a bill or a direct payment, never both.
+ALTER TABLE split_payouts ALTER COLUMN split_id DROP NOT NULL;
+ALTER TABLE split_payouts ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE split_payouts ADD CONSTRAINT split_payouts_one_source
+        CHECK (num_nonnulls(split_id, direct_payment_id) = 1);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE SET NULL;
+ALTER TABLE stripe_disputes ADD COLUMN IF NOT EXISTS direct_payment_id INT REFERENCES direct_payments(id) ON DELETE SET NULL;
+
+
+-- ---------------------------------------------------------------------------
 -- stripe_webhook_events: Stripe retries webhooks, so each event is handled once
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stripe_webhook_events (
@@ -400,3 +492,40 @@ CREATE TABLE IF NOT EXISTS stripe_webhook_events (
     -- Null until the handler finishes, so a failed attempt is retried.
     processed_at  TIMESTAMPTZ
 );
+
+
+-- ---------------------------------------------------------------------------
+-- notifications: the in-app inbox (bell on Home)
+-- ---------------------------------------------------------------------------
+-- What happened and who did it, not finished text: the wording is built when
+-- read (services/notifyService.js), so renamed or deleted people show right.
+-- Delivered live over GET /users/me/events while the app is open.
+CREATE TABLE IF NOT EXISTS notifications (
+    id                 BIGSERIAL PRIMARY KEY,
+    user_id            INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind               VARCHAR(32) NOT NULL
+                       CHECK (kind IN ('bill_opened', 'bill_cancelled', 'share_charged', 'share_declined',
+                                       'paid_you', 'payback_received', 'payback_refunded', 'group_invite',
+                                       'item_assigned')),
+    actor_id           INT REFERENCES users(id) ON DELETE SET NULL,
+    group_id           INT REFERENCES groups(id) ON DELETE SET NULL,
+    split_id           INT REFERENCES splits(id) ON DELETE SET NULL,
+    direct_payment_id  INT REFERENCES direct_payments(id) ON DELETE SET NULL,
+    amount_cents       INT,
+    -- The bill title or pay-back note when it happened (kept if the bill goes).
+    label              VARCHAR(255),
+    -- Webhooks and retries repeat events; one notification per event.
+    dedupe_key         VARCHAR(128) NOT NULL,
+    read_at            TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, dedupe_key)
+);
+
+-- upgrade: kinds added since the table was created.
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_kind_check,
+    ADD CONSTRAINT notifications_kind_check
+        CHECK (kind IN ('bill_opened', 'bill_cancelled', 'share_charged', 'share_declined',
+                        'paid_you', 'payback_received', 'payback_refunded', 'group_invite', 'item_assigned'));
+
+CREATE INDEX IF NOT EXISTS notifications_inbox ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread ON notifications (user_id) WHERE read_at IS NULL;

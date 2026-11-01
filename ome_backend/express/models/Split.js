@@ -11,12 +11,14 @@ class Split {
 
     async CreateSplit({
         groupId, createdBy, title, merchantName, receiptDate, currency, taxCents, tipCents, items, hostIds, memberIds,
+        receiptId = null,
     }) {
         return withTransaction(async (client) => {
             const created = await client.query(
-                `INSERT INTO splits (group_id, created_by, title, merchant_name, receipt_date, currency, tax_cents, tip_cents)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-                [groupId, createdBy, title, merchantName, receiptDate, currency, taxCents, tipCents])
+                `INSERT INTO splits (group_id, created_by, title, merchant_name, receipt_date, currency, tax_cents,
+                                     tip_cents, receipt_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                [groupId, createdBy, title, merchantName, receiptDate, currency, taxCents, tipCents, receiptId])
             const splitId = created.rows[0].id
             await client.query(
                 `INSERT INTO split_participants (split_id, user_id, is_host)
@@ -67,8 +69,11 @@ class Split {
             `SELECT c.item_id, c.user_id FROM split_item_claims c
              JOIN split_items i ON i.id = c.item_id WHERE i.split_id = $1`, [splitId])
         const participantsResult = await client.query(
-            `SELECT p.*, u.username, u.default_payment_method_id, u.card_exp_month, u.card_exp_year
+            `SELECT p.*, u.username, u.default_payment_method_id, u.card_exp_month, u.card_exp_year,
+                    COALESCE(chosen.brand, u.card_brand) AS pay_brand,
+                    COALESCE(chosen.last4, u.card_last4) AS pay_last4
              FROM split_participants p JOIN users u ON u.id = p.user_id
+             LEFT JOIN user_cards chosen ON chosen.stripe_payment_method_id = p.payment_method_id
              WHERE p.split_id = $1 ORDER BY p.is_host DESC, u.username`, [splitId])
         const claimsByItem = new Map()
         for (const { item_id: itemId, user_id: userId } of claimsResult.rows) {
@@ -114,6 +119,8 @@ class Split {
             title: split.title,
             merchantName: split.merchant_name,
             receiptDate: split.receipt_date,
+            // Photo of the receipt, viewable by the group (GET /receipts/:id).
+            receiptId: split.receipt_id,
             status: split.status,
             mode: split.split_mode,
             currency: split.currency,
@@ -134,6 +141,9 @@ class Split {
                     paymentStatus: p.payment_status,
                     // Lets hosts spot anyone whose card expired since they joined.
                     cardOnFile: Profile.HasValidCard(p),
+                    // The card this person's share is charged to: one they picked
+                    // for this bill, else their default. Display details only.
+                    card: p.pay_last4 ? { brand: p.pay_brand, last4: p.pay_last4, chosen: Boolean(p.payment_method_id) } : null,
                 }
             }),
             totals: {
@@ -197,7 +207,9 @@ class Split {
 
     async ParticipantsToCharge(splitId) {
         const result = await this.pool.query(
-            `SELECT p.user_id, p.charge_cents, u.stripe_customer_id, u.default_payment_method_id, s.currency
+            `SELECT p.user_id, p.charge_cents, u.stripe_customer_id, s.currency,
+                    -- The card picked for this bill, else their default.
+                    COALESCE(p.payment_method_id, u.default_payment_method_id) AS default_payment_method_id
              FROM split_participants p
              JOIN users u ON u.id = p.user_id
              JOIN splits s ON s.id = p.split_id

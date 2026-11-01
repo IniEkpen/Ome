@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { profile } = require('../models/Profile')
 const { requireUser, HttpError } = require('../auth')
 const splits = require('../services/splitService')
 
@@ -21,7 +22,25 @@ router.put('/:splitId/items/:itemId/claim', async (req, res) => {
     return res.json({ split })
 })
 
+// Anyone being charged: which of their own cards pays their share.
+router.put('/:splitId/card', async (req, res) => {
+    const user = await profile.GetProfileById(req.user.id)
+    if (!user) throw new HttpError(401, 'Please sign in again.', 'unauthenticated')
+    const choice = req.body?.paymentMethodId ?? null
+    return res.json({ split: await splits.chooseCard(user, idParam(req, 'splitId'), choice) })
+})
+
 // Host only from here down.
+
+// The roulette: put an item on someone's share ({ userId, claimed: true }) or
+// take it off ({ userId, claimed: false }).
+router.put('/:splitId/items/:itemId/assign', async (req, res) => {
+    const userId = Number(req.body?.userId)
+    if (!Number.isInteger(userId) || userId <= 0) throw new HttpError(400, 'Choose who it goes to.', 'invalid_user')
+    const split = await splits.assignItem(
+        req.user, idParam(req, 'splitId'), idParam(req, 'itemId'), userId, req.body?.claimed !== false)
+    return res.json({ split })
+})
 router.put('/:splitId/mode', async (req, res) => {
     return res.json({ split: await splits.setMode(req.user, idParam(req, 'splitId'), req.body?.mode) })
 })
